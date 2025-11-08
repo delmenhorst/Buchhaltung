@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, send_file
 from pathlib import Path
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from ocr_processor import OCRProcessor
 from income_processor import IncomeProcessor
 from database import Database
