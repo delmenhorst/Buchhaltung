@@ -20,7 +20,7 @@ This is a Flask-based accounting application (Buchhaltungs-App) designed for fre
 - **Backend**: Python 3.14+, Flask 3.0+
 - **Database**: SQLite3 (invoices.db)
 - **OCR**: Pytesseract (requires Tesseract binary with German language support)
-- **LLM**: Ollama (local, recommended: gemma3:27b)
+- **LLM**: Ollama (local, recommended: gemma3:4b)
 - **Frontend**: Jinja2 templates, Alpine.js, Tailwind CSS (CDN)
 - **Image Processing**: Pillow, pdf2image (HEIC → PDF conversion)
 - **Export**: openpyxl (Excel generation)
@@ -40,7 +40,7 @@ brew install tesseract tesseract-lang
 # Optional: Install Ollama for AI features
 brew install ollama
 ollama serve &
-ollama pull gemma3:27b
+ollama pull gemma3:4b
 ```
 
 ### Daily Development
@@ -96,7 +96,7 @@ SELECT COUNT(*) FROM invoices WHERE processed = 1 AND is_archived = 1;
 
 **ocr_processor.py / income_processor.py** (OCR Pipeline)
 - Extracts text via Tesseract (German + English)
-- Attempts LLM extraction via Ollama (gemma3:27b)
+- Attempts LLM extraction via Ollama (gemma3:4b)
 - Falls back to regex patterns if LLM unavailable
 - Expense categories: Büro, Raum, Telefon, Fahrtkosten, Fortbildung, Versicherung, Porto, Werbung, Sonstiges
 - Income categories: Honorar, Lizenzgebühren, Workshops, Stipendien, Verkäufe, Sonstiges

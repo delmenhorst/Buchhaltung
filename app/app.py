@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, jsonify, send_file
 from pathlib import Path
+import os
+from datetime import datetime, timedelta
 from ocr_processor import OCRProcessor
 from income_processor import IncomeProcessor
 from database import Database
@@ -11,7 +13,19 @@ from pdf_generator import PDFGenerator
 from full_exporter import FullExporter
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-change-this'
+
+# Load SECRET_KEY from environment or use default (dev only)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
+
+# Session configuration for better security and stability
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access (XSS protection)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+# Only set SECURE in production (requires HTTPS)
+if os.environ.get('FLASK_ENV') != 'development':
+    app.config['SESSION_COOKIE_SECURE'] = True
 
 # Paths
 BASE_DIR = Path(__file__).parent.parent  # Go up to FINANZEN folder
@@ -303,7 +317,7 @@ def update_invoice(file_id):
                               .replace('/', '-')
                               .replace(' ', '_')
                               .strip('_'))
-            amount_safe = str(data.get('amount', 0)).replace('.', '_')
+            amount_safe = f"{float(data.get('amount', 0)):.2f}".replace('.', '_')
 
             new_filename = f"{date_str}_{next_id}_{category_safe}_{description_safe}_{amount_safe}.pdf"
             new_filename = new_filename.replace('__', '_')  # Clean double underscores
@@ -701,7 +715,7 @@ def update_income(file_id):
                               .replace('/', '-')
                               .replace(' ', '_')
                               .strip('_'))
-            amount_safe = str(data.get('amount', 0)).replace('.', '_')
+            amount_safe = f"{float(data.get('amount', 0)):.2f}".replace('.', '_')
 
             new_filename = f"{date_str}_{next_id}_{category_safe}_{description_safe}_{amount_safe}.pdf"
             new_filename = new_filename.replace('__', '_')  # Clean double underscores
@@ -961,7 +975,7 @@ def create_manual_invoice():
                           .replace('/', '-')
                           .replace(' ', '_')
                           .strip('_'))
-        amount_safe = str(data.get('amount', 0)).replace('.', '_')
+        amount_safe = f"{float(data.get('amount', 0)):.2f}".replace('.', '_')
 
         filename = f"{date_str}_{next_id}_{category_safe}_{description_safe}_{amount_safe}.virtual"
         filename = filename.replace('__', '_')  # Clean double underscores
@@ -1447,7 +1461,7 @@ def generate_missing_placeholders():
                               .replace('/', '-')
                               .replace(' ', '_')
                               .strip('_'))
-            amount_safe = str(invoice_dict.get('amount', 0)).replace('.', '_')
+            amount_safe = f"{float(invoice_dict.get('amount', 0)):.2f}".replace('.', '_')
 
             pdf_filename = f"{date_str}_{invoice_dict['invoice_id']}_{category_safe}_{description_safe}_{amount_safe}.pdf"
             pdf_filename = pdf_filename.replace('__', '_')  # Clean double underscores

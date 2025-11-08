@@ -59,7 +59,7 @@ Buchhaltung/
 - **Flask 3.0+**: Web-Framework
 - **SQLite**: Datenbank (über `sqlite3`)
 - **Pytesseract**: OCR-Engine
-- **Ollama**: Lokales LLM (gemma3:27b)
+- **Ollama**: Lokales LLM (gemma3:4b)
 - **Pillow**: Bildverarbeitung
 - **pdf2image**: PDF zu Bild Konvertierung
 
@@ -172,7 +172,7 @@ if is_image(file):
 # Für Ausgaben
 ocr_processor.process_file()
     → Tesseract OCR (deu+eng)
-    → LLM Extraktion (gemma3:27b)
+    → LLM Extraktion (gemma3:4b)
     → Fallback: Regex-Pattern
 
 # Extrahiert:
@@ -229,21 +229,21 @@ brew install ollama  # macOS
 ollama serve         # Server starten
 
 # Model herunterladen
-ollama pull gemma3:27b
+ollama pull gemma3:4b
 ```
 
 ### Verwendung in der App
 
-Die App verwendet **gemma3:27b** für intelligente Extraktion:
+Die App verwendet **gemma3:4b** für intelligente Extraktion:
 
 ```python
 # llm_extractor.py
 class LLMExtractor:
-    def __init__(self, model='gemma3:27b'):
+    def __init__(self, model='gemma3:4b'):
         self.model = model
 ```
 
-**Warum gemma3:27b?**
+**Warum gemma3:4b?**
 - Bessere Genauigkeit als llama3.2:3b
 - Versteht Kontext (Netto vs. Brutto)
 - Robuste JSON-Ausgabe
@@ -496,7 +496,7 @@ brew install tesseract-lang  # Deutsche Sprache
 # 5. Ollama setup (optional, empfohlen)
 brew install ollama
 ollama serve &
-ollama pull gemma3:27b
+ollama pull gemma3:4b
 
 # 6. App starten
 python app.py

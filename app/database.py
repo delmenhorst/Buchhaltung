@@ -1087,12 +1087,6 @@ class Database:
         recurring = self.get_recurring_transactions(active_only=True)
 
         for rec in recurring:
-            # Check if end_date has passed
-            if rec['end_date']:
-                end_date = datetime.strptime(rec['end_date'], '%Y-%m-%d').date()
-                if today > end_date:
-                    continue
-
             # Parse dates
             start_date = datetime.strptime(rec['start_date'], '%Y-%m-%d').date()
             last_generated = None
