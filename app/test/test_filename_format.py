@@ -51,7 +51,7 @@ def test_lange_beschreibung_wird_gekuerzt():
     truncated = long_description[:30].replace('/', '-').replace(' ', '_').strip('_')
 
     assert len(truncated) <= 30, "Truncated description should be ≤ 30 chars"
-    assert truncated == 'Dies_ist_eine_sehr_lange_Besc', "Truncation should match expected pattern"
+    assert truncated == 'Dies_ist_eine_sehr_lange_Besch', "Truncation should match expected pattern"
 
 
 def test_filename_pattern_regex_validation():

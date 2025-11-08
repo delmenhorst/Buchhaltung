@@ -13,10 +13,8 @@ from pathlib import Path
 def test_create_business_creates_folders(test_db, test_data_dir, folder_manager):
     """Test: Business erstellen → Ordner werden erstellt"""
     business_name = 'TestBiz'
-    business_id = test_db.add_business(
+    business_id = test_db.create_business(
         name=business_name,
-        inbox_path=str(test_data_dir / 'Inbox' / business_name),
-        archive_path=str(test_data_dir / 'Archive' / business_name),
         prefix='TZ',
         color='#FF0000'
     )
@@ -37,10 +35,8 @@ def test_create_business_creates_folders(test_db, test_data_dir, folder_manager)
 def test_delete_business_with_cascade(test_db, test_data_dir, folder_manager, create_test_invoice):
     """Test: Business mit CASCADE löschen → Alle Daten weg"""
     business_name = 'DeleteMe'
-    business_id = test_db.add_business(
+    business_id = test_db.create_business(
         name=business_name,
-        inbox_path=str(test_data_dir / 'Inbox' / business_name),
-        archive_path=str(test_data_dir / 'Archive' / business_name),
         prefix='DM',
         color='#00FF00'
     )

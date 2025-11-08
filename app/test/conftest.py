@@ -39,16 +39,8 @@ def test_db(test_data_dir):
 @pytest.fixture
 def folder_manager(test_data_dir):
     """FolderManager fixture with test directories"""
-    inbox_dir = test_data_dir / 'Inbox'
-    archive_dir = test_data_dir / 'Archive'
-
-    inbox_dir.mkdir(exist_ok=True)
-    archive_dir.mkdir(exist_ok=True)
-
-    fm = FolderManager(
-        inbox_base=str(inbox_dir),
-        archive_base=str(archive_dir)
-    )
+    # FolderManager takes only base_dir parameter
+    fm = FolderManager(str(test_data_dir))
 
     yield fm
 
@@ -59,10 +51,8 @@ def test_business(test_db, test_data_dir):
     business_name = 'TestBusiness'
     prefix = 'TB'
 
-    business_id = test_db.add_business(
+    business_id = test_db.create_business(
         name=business_name,
-        inbox_path=str(test_data_dir / 'Inbox' / business_name),
-        archive_path=str(test_data_dir / 'Archive' / business_name),
         prefix=prefix,
         color='#3B82F6'
     )
