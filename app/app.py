@@ -189,7 +189,8 @@ def serve_file(file_id):
     if not file_info:
         return "File not found", 404
 
-    file_path = Path(file_info['file_path'])
+    # Resolve file_path relative to BASE_DIR (file paths in DB are relative)
+    file_path = BASE_DIR / file_info['file_path']
 
     # Check if it's a placeholder PDF
     if file_info.get('is_placeholder_pdf'):
@@ -273,7 +274,7 @@ def update_invoice(file_id):
         # For bulk updates, regenerate placeholder PDF if it's a placeholder
         if is_bulk_update and file_info.get('is_placeholder_pdf'):
             file_path = file_info.get('file_path', '')
-            if file_path and Path(file_path).exists():
+            if file_path and (BASE_DIR / file_path).exists():
                 # Get updated invoice data
                 updated_invoice = db.get_file(file_id)
                 if updated_invoice.get('invoice_id'):
@@ -824,7 +825,7 @@ def delete_invoice(file_id):
 
         # Delete physical file if it exists and is not a virtual file
         if invoice['file_path'] and not invoice.get('is_recurring_generated'):
-            file_path = Path(invoice['file_path'])
+            file_path = BASE_DIR / invoice['file_path']
             if file_path.exists():
                 file_path.unlink()
 
@@ -1072,8 +1073,9 @@ def create_manual_invoice():
             # Determine if income or expense
             is_income = data['type'] == 'income'
 
-            # Create PDF filename
-            pdf_filename = f"{next_id}.pdf"
+            # Create semantic PDF filename: YYMMDD_InvoiceID_Category_Description_Amount.pdf
+            pdf_filename = f"{date_str}_{next_id}_{category_safe}_{description_safe}_{amount_safe}.pdf"
+            pdf_filename = pdf_filename.replace('__', '_')  # Clean double underscores
             pdf_path = archive_dir / pdf_filename
 
             # Prepare invoice data for PDF generation
@@ -1435,7 +1437,12 @@ def generate_recurring():
 def _regenerate_placeholder_pdf(invoice_data, pdf_gen, database):
     """Helper function to regenerate placeholder PDF after updates"""
     file_path = invoice_data.get('file_path', '')
-    if not file_path or not Path(file_path).exists():
+    if not file_path:
+        return
+
+    # Resolve relative path to absolute path
+    absolute_path = BASE_DIR / file_path
+    if not absolute_path.exists():
         return
 
     # Get business name
@@ -1454,7 +1461,7 @@ def _regenerate_placeholder_pdf(invoice_data, pdf_gen, database):
     }
 
     # Regenerate PDF at the same location
-    pdf_gen.generate_placeholder_pdf(pdf_data, Path(file_path))
+    pdf_gen.generate_placeholder_pdf(pdf_data, absolute_path)
     print(f"✅ Regenerated placeholder PDF for {invoice_data.get('invoice_id')}")
 
 # ============================================================
@@ -1535,9 +1542,10 @@ def generate_missing_placeholders():
 
             pdf_generator.generate_placeholder_pdf(pdf_data, pdf_path)
 
-            # Update database
+            # Update database with RELATIVE path (relative to BASE_DIR)
+            relative_path = f"Archive/{business['name']}/{type_folder}/{year}/{pdf_filename}"
             db.update_invoice(invoice_dict['id'], {
-                'file_path': str(pdf_path),
+                'file_path': relative_path,
                 'is_placeholder_pdf': True,
                 'is_archived': True
             })
