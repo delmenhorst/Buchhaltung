@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Einnahmen Prüfung - Buchhaltung{% endblock %}
+
+{% block content %}
+{% if invoices|length == 0 %}
+    <div class="alert alert-info fade-in">
+        Keine Einnahmen zur Prüfung vorhanden.
+    </div>
+{% else %}
+    <div class="review-layout">
+        <!-- LEFT SIDE: Form -->
+        <div class="review-form-side">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Einnahme <span id="currentIndex">1</span> von {{ invoices|length }}</h5>
+                    <small id="currentFilename">{{ invoices[0].original_filename }}</small>
+                </div>
+                <div class="card-body">
+                    <!-- Progress Bar -->
+                    <div class="mb-3">
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar"
+                                 style="width: {{ (1 / invoices|length * 100)|round(1) }}%;"
+                                 id="progressBar"></div>
+                        </div>
+                        <small class="text-muted">Fortschritt: <span id="progressText">1 von {{ invoices|length }}</span></small>
+                    </div>
+
+                    <!-- Form -->
+                    <form id="reviewForm">
+                        <input type="hidden" id="invoiceId" value="{{ invoices[0].id }}">
+
+                        <div class="mb-3">
+                            <label for="date" class="form-label">Datum *</label>
+                            <input type="date" class="form-control" id="date" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Betrag (EUR) *</label>
+                            <input type="number" step="0.01" class="form-control" id="amount" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Kategorie *</label>
+                            <select class="form-select" id="category" required>
+                                <option value="">Bitte wählen...</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Beschreibung</label>
+                            <input type="text" class="form-control" id="description" maxlength="50"
+                                   placeholder="z.B. Signa-Projekt">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">OCR Text (Referenz)</label>
+                            <textarea class="form-control ocr-text-preview" id="ocrText" rows="4" readonly></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-circle"></i> Speichern & Nächste
+                            </button>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-outline-secondary" id="skipBtn">
+                                    Überspringen
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" id="refreshOcrBtn">
+                                    <i class="bi bi-arrow-repeat"></i> OCR neu
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDE: PDF Preview -->
+        <div class="review-preview-side">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">Dokumenten-Vorschau</h6>
+                </div>
+                <div class="card-body p-2">
+                    <div class="pdf-preview-container" id="pdfPreview">
+                        <p class="text-center text-muted p-5">Lade Vorschau...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-check-circle-fill"></i> Erfolgreich gespeichert
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p><strong>Datei umbenannt zu:</strong></p>
+                <div class="alert alert-light">
+                    <code id="newFilename" style="word-break: break-all;"></code>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                    Weiter
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let invoices = {{ invoices|tojson }};
+let currentIndex = 0;
+
+$(document).ready(function() {
+    // Check if specific invoice ID is requested via URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedId = urlParams.get('id');
+
+    if (requestedId) {
+        const index = invoices.findIndex(inv => inv.id == requestedId);
+        if (index !== -1) {
+            currentIndex = index;
+        }
+    }
+
+    loadCategories();
+    loadInvoice(currentIndex);
+
+    $('#reviewForm').submit(function(e) {
+        e.preventDefault();
+        saveInvoice();
+    });
+
+    $('#skipBtn').click(function() {
+        currentIndex++;
+        if (currentIndex < invoices.length) {
+            loadInvoice(currentIndex);
+        } else {
+            window.location.href = '/';
+        }
+    });
+
+    $('#refreshOcrBtn').click(function() {
+        const invoiceId = $('#invoiceId').val();
+        $(this).prop('disabled', true).html('<span class="spinner"></span> Lade...');
+
+        $.get('/income/process/' + invoiceId, function(data) {
+            $('#date').val(data.date || '');
+            $('#amount').val(data.amount || '');
+            $('#category').val(data.category || '');
+            $('#description').val(data.description || '');
+            $('#ocrText').val(data.text || '');
+
+            $('#refreshOcrBtn').prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> OCR neu');
+        }).fail(function() {
+            alert('Fehler beim OCR-Neustart');
+            $('#refreshOcrBtn').prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> OCR neu');
+        });
+    });
+});
+
+function loadCategories() {
+    $.get('/api/income/categories', function(categories) {
+        categories.forEach(cat => {
+            $('#category').append('<option value="' + cat + '">' + cat + '</option>');
+        });
+    });
+}
+
+function loadInvoice(index) {
+    if (index >= invoices.length) {
+        window.location.href = '/';
+        return;
+    }
+
+    const invoice = invoices[index];
+
+    // Update progress
+    const progress = ((index + 1) / invoices.length * 100).toFixed(1);
+    $('#progressBar').css('width', progress + '%');
+    $('#progressText').text((index + 1) + ' von ' + invoices.length);
+
+    // Update form
+    $('#currentIndex').text(index + 1);
+    $('#currentFilename').text(invoice.original_filename);
+    $('#invoiceId').val(invoice.id);
+    $('#date').val(invoice.date || '');
+    $('#amount').val(invoice.amount || '');
+    $('#category').val(invoice.category || '');
+    $('#description').val(invoice.description || '');
+    $('#ocrText').val(invoice.ocr_text || '');
+
+    // Load preview
+    loadPreview(invoice.id, invoice.file_path);
+}
+
+function loadPreview(invoiceId, filePath) {
+    const fileExt = filePath.split('.').pop().toLowerCase();
+    const previewUrl = '/file/' + invoiceId;
+
+    let previewHtml = '';
+
+    if (fileExt === 'pdf') {
+        previewHtml = '<embed src="' + previewUrl + '" type="application/pdf" width="100%" height="100%" />';
+    } else if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExt)) {
+        previewHtml = '<img src="' + previewUrl + '" alt="Invoice preview" class="img-fluid" />';
+    } else {
+        previewHtml = '<p class="text-center text-muted p-5">Vorschau nicht verfügbar</p>';
+    }
+
+    $('#pdfPreview').html(previewHtml);
+}
+
+function saveInvoice() {
+    const invoiceId = $('#invoiceId').val();
+    const data = {
+        date: $('#date').val(),
+        amount: parseFloat($('#amount').val()),
+        category: $('#category').val(),
+        description: $('#description').val()
+    };
+
+    const submitBtn = $('#reviewForm button[type="submit"]');
+    const originalHtml = submitBtn.html();
+    submitBtn.prop('disabled', true).html('<span class="spinner"></span> Speichere...');
+
+    $.ajax({
+        url: '/api/income/' + invoiceId,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            // Directly load next invoice without modal
+            currentIndex++;
+            if (currentIndex < invoices.length) {
+                loadInvoice(currentIndex);
+                submitBtn.prop('disabled', false).html(originalHtml);
+            } else {
+                // All done, redirect to documents
+                window.location.href = '/documents';
+            }
+        },
+        error: function(xhr) {
+            alert('Fehler beim Speichern: ' + (xhr.responseJSON ? xhr.responseJSON.error : 'Unbekannter Fehler'));
+            submitBtn.prop('disabled', false).html(originalHtml);
+        }
+    });
+}
+</script>
+{% endblock %}

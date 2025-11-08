@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Statistik - Buchhaltung{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1>Statistik</h1>
+        <p class="text-muted">Übersicht über verarbeitete Ausgaben</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card fade-in">
+            <h5>Gesamt</h5>
+            <h2>{{ stats.total }}</h2>
+            <p class="mb-0">Dateien</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card success fade-in" style="animation-delay: 0.1s;">
+            <h5>Verarbeitet</h5>
+            <h2>{{ stats.processed }}</h2>
+            <p class="mb-0">Rechnungen</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card warning fade-in" style="animation-delay: 0.2s;">
+            <h5>Ausstehend</h5>
+            <h2>{{ stats.pending }}</h2>
+            <p class="mb-0">Dateien</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card info fade-in" style="animation-delay: 0.3s;">
+            <h5>Gesamtbetrag</h5>
+            <h2>{{ "%.2f"|format(stats.total_amount) }} €</h2>
+            <p class="mb-0">Ausgaben</p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card fade-in">
+            <div class="card-header">
+                <h5 class="mb-0">Ausgaben nach Kategorie</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if stats.by_category|length > 0 %}
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Kategorie</th>
+                            <th class="text-center">Anzahl</th>
+                            <th class="text-end">Gesamtbetrag</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cat in stats.by_category %}
+                        <tr>
+                            <td><strong>{{ cat.category }}</strong></td>
+                            <td class="text-center">
+                                <span class="badge bg-primary">{{ cat.count }}</span>
+                            </td>
+                            <td class="text-end">
+                                <strong>{{ "%.2f"|format(cat.total) }} €</strong>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-active">
+                            <th>GESAMT</th>
+                            <th class="text-center">{{ stats.processed }}</th>
+                            <th class="text-end">{{ "%.2f"|format(stats.total_amount) }} €</th>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    Noch keine verarbeiteten Rechnungen vorhanden.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <a href="/export/excel" class="btn btn-success btn-lg">
+            <i class="bi bi-file-earmark-excel"></i> Nach Excel exportieren
+        </a>
+        <a href="/" class="btn btn-outline-primary btn-lg ms-2">
+            <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+        </a>
+    </div>
+</div>
+{% endblock %}

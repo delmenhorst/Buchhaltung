@@ -1,0 +1,272 @@
+{% extends "base_new.html" %}
+
+{% block page_title %}Wiederkehrende Buchungen{% endblock %}
+
+{% block content %}
+<div class="h-full p-6" x-data="recurringApp()">
+
+    <!-- Header -->
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-apple-gray-900">Wiederkehrende Buchungen</h1>
+            <p class="text-sm text-apple-gray-500 mt-1">Automatische Einnahmen und Ausgaben verwalten</p>
+        </div>
+        <button
+            @click="showModal = true; editingId = null"
+            class="px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm"
+        >
+            + Neue Buchung
+        </button>
+    </div>
+
+    <!-- Recurring Transactions List -->
+    <div class="bg-white rounded-lg shadow-sm border border-apple-gray-200">
+        <template x-for="rec in recurring" :key="rec.id">
+            <div class="p-4 border-b border-apple-gray-200 hover:bg-apple-gray-50 transition-colors">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="px-2 py-1 text-xs font-medium rounded"
+                                :class="rec.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'"
+                                x-text="rec.type === 'income' ? 'Einnahme' : 'Ausgabe'"
+                            ></span>
+                            <h3 class="font-semibold text-apple-gray-900" x-text="rec.description"></h3>
+                        </div>
+                        <div class="mt-2 flex items-center gap-4 text-sm text-apple-gray-600">
+                            <span x-text="rec.amount + ' €'"></span>
+                            <span x-text="rec.category"></span>
+                            <span x-text="getFrequencyText(rec.frequency)"></span>
+                            <span x-text="'Am ' + rec.day_of_month + '. des Monats'"></span>
+                            <span
+                                class="px-2 py-0.5 bg-apple-blue/10 text-apple-blue rounded text-xs font-medium"
+                                x-text="rec.generated_count + ' generiert'"
+                            ></span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button
+                            @click="toggleActive(rec)"
+                            :class="rec.active ? 'bg-apple-green text-white' : 'bg-apple-gray-200 text-apple-gray-600'"
+                            class="px-3 py-1 rounded text-xs font-medium"
+                            x-text="rec.active ? 'Aktiv' : 'Inaktiv'"
+                        ></button>
+                        <button
+                            @click="editRecurring(rec)"
+                            class="p-2 text-apple-gray-600 hover:bg-apple-gray-100 rounded"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </button>
+                        <button
+                            @click="deleteRecurring(rec.id)"
+                            class="p-2 text-red-600 hover:bg-red-50 rounded"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Empty State -->
+        <div x-show="recurring.length === 0" class="p-12 text-center">
+            <p class="text-apple-gray-500">Keine wiederkehrenden Buchungen vorhanden</p>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div
+        x-show="showModal"
+        @click.away="showModal = false"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        style="display: none;"
+    >
+        <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.stop>
+            <h2 class="text-xl font-bold mb-4" x-text="editingId ? 'Bearbeiten' : 'Neue wiederkehrende Buchung'"></h2>
+
+            <form @submit.prevent="saveRecurring()" class="space-y-4">
+                <!-- Type -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Typ</label>
+                    <select x-model="form.type" @change="form.category = categoryOptions[0]" required class="w-full px-3 py-2 border rounded-lg">
+                        <option value="expense">Ausgabe</option>
+                        <option value="income">Einnahme</option>
+                    </select>
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Beschreibung</label>
+                    <input x-model="form.description" required class="w-full px-3 py-2 border rounded-lg">
+                </div>
+
+                <!-- Amount & Category -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Betrag (€)</label>
+                        <input type="number" step="0.01" x-model="form.amount" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Kategorie</label>
+                        <select x-model="form.category" @change="updateCategoryOptions" required class="w-full px-3 py-2 border rounded-lg">
+                            <template x-for="cat in categoryOptions" :key="cat">
+                                <option :value="cat" x-text="cat"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Frequency & Day -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Wiederholung</label>
+                        <select x-model="form.frequency" required class="w-full px-3 py-2 border rounded-lg">
+                            <option value="monthly">Monatlich</option>
+                            <option value="quarterly">Vierteljährlich</option>
+                            <option value="yearly">Jährlich</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Am Tag</label>
+                        <input type="number" min="1" max="31" x-model="form.day_of_month" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                </div>
+
+                <!-- Dates -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Startdatum</label>
+                        <input type="date" x-model="form.start_date" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Enddatum (optional)</label>
+                        <input type="date" x-model="form.end_date" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex justify-end gap-2 pt-4">
+                    <button type="button" @click="showModal = false" class="px-4 py-2 text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg">
+                        Abbrechen
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600">
+                        Speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function recurringApp() {
+    return {
+        recurring: {{ recurring_transactions | tojson }},
+        showModal: false,
+        editingId: null,
+        form: {
+            type: 'expense',
+            description: '',
+            amount: '',
+            category: '',
+            frequency: 'monthly',
+            day_of_month: 1,
+            start_date: '',
+            end_date: ''
+        },
+        expenseCategories: ['Büro', 'Raum', 'Telefon', 'Fahrtkosten', 'Fortbildung', 'Versicherung', 'Porto', 'Werbung', 'Sonstiges'],
+        incomeCategories: ['Honorar', 'Lizenzgebühren', 'Workshops', 'Stipendien', 'Verkäufe', 'Sonstiges'],
+
+        get categoryOptions() {
+            return this.form.type === 'income' ? this.incomeCategories : this.expenseCategories;
+        },
+
+        getFrequencyText(freq) {
+            const texts = {
+                'monthly': 'Monatlich',
+                'quarterly': 'Vierteljährlich',
+                'yearly': 'Jährlich'
+            };
+            return texts[freq] || freq;
+        },
+
+        async toggleActive(rec) {
+            try {
+                await fetch(`/api/recurring/${rec.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active: !rec.active })
+                });
+                rec.active = !rec.active;
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Fehler beim Aktualisieren');
+            }
+        },
+
+        editRecurring(rec) {
+            this.editingId = rec.id;
+            this.form = {
+                type: rec.type,
+                description: rec.description,
+                amount: rec.amount,
+                category: rec.category,
+                frequency: rec.frequency,
+                day_of_month: rec.day_of_month,
+                start_date: rec.start_date,
+                end_date: rec.end_date || ''
+            };
+            this.showModal = true;
+        },
+
+        async saveRecurring() {
+            try {
+                const businessId = getSelectedBusinessId();
+                const url = this.editingId ? `/api/recurring/${this.editingId}` : '/api/recurring';
+                const method = this.editingId ? 'PUT' : 'POST';
+
+                // Add business_id to form data
+                const formData = { ...this.form };
+                if (businessId) {
+                    formData.business_id = businessId;
+                }
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    showToast('Fehler beim Speichern', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Fehler beim Speichern: ' + error.message, 'error');
+            }
+        },
+
+        async deleteRecurring(id) {
+            if (!confirm('Wirklich löschen?')) return;
+
+            try {
+                await fetch(`/api/recurring/${id}`, { method: 'DELETE' });
+                this.recurring = this.recurring.filter(r => r.id !== id);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Fehler beim Löschen');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

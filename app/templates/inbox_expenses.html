@@ -1,0 +1,1585 @@
+{% extends "base_new.html" %}
+
+{% block page_title %}Ausgaben{% endblock %}
+
+{% block content %}
+<div class="flex h-full" x-data="inboxApp()">
+
+    <!-- Document List (Left) -->
+    <div class="w-96 bg-white border-r border-apple-gray-200 flex flex-col">
+
+        <!-- Search & Filter Bar -->
+        <div class="p-3 border-b border-apple-gray-200">
+            <div class="relative">
+                <input
+                    type="text"
+                    x-model="searchQuery"
+                    @input="filterDocuments()"
+                    placeholder="Suche..."
+                    class="w-full px-4 py-2 pl-10 text-sm bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                >
+                <svg class="absolute left-3 top-2.5 w-5 h-5 text-apple-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="flex flex-wrap gap-2 mt-3 text-sm">
+                <button
+                    @click="filter = 'all'; filterDocuments()"
+                    :class="filter === 'all' ? 'bg-apple-blue text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                    class="px-3 py-1.5 rounded-lg font-medium transition-colors"
+                >
+                    Alle
+                </button>
+                <button
+                    @click="filter = 'unprocessed'; filterDocuments()"
+                    :class="filter === 'unprocessed' ? 'bg-apple-blue text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                    class="px-3 py-1.5 rounded-lg font-medium transition-colors"
+                >
+                    Inbox
+                    <span x-show="unprocessedCount > 0" x-text="unprocessedCount" class="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded-full"></span>
+                </button>
+                <button
+                    @click="filter = 'archived'; filterDocuments()"
+                    :class="filter === 'archived' ? 'bg-apple-blue text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                    class="px-3 py-1.5 rounded-lg font-medium transition-colors"
+                >
+                    Archiv
+                    <span x-show="archivedCount > 0" x-text="archivedCount" class="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded-full"></span>
+                </button>
+                <button
+                    @click="filter = 'flagged'; filterDocuments()"
+                    :class="filter === 'flagged' ? 'bg-apple-orange text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                    class="px-3 py-1.5 rounded-lg font-medium transition-colors"
+                >
+                    <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>
+                    </svg>
+                    Geflaggt
+                    <span x-show="flaggedCount > 0" x-text="flaggedCount" class="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded-full"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Document List -->
+        <div class="flex-1 overflow-y-auto">
+            <template x-for="(doc, index) in filteredDocuments" :key="doc.id">
+                <div
+                    @click="handleDocumentClick(doc, index, $event)"
+                    :class="{
+                        'bg-apple-blue text-white': selectedDoc && selectedDoc.id === doc.id && selectedDocs.length === 0,
+                        'bg-blue-100 border-l-4 border-apple-blue': selectedDocs.includes(doc.id),
+                        'bg-gray-50': doc.is_recurring_generated && !selectedDocs.includes(doc.id) && !(selectedDoc && selectedDoc.id === doc.id),
+                        'hover:bg-apple-gray-100': !selectedDocs.includes(doc.id) && !(selectedDoc && selectedDoc.id === doc.id)
+                    }"
+                    class="px-4 py-3 border-b border-apple-gray-200 cursor-pointer transition-colors select-none relative"
+                >
+                    <!-- Status Indicators (Top-Right Corner) -->
+                    <div class="absolute top-2 right-2 flex items-center gap-1">
+                        <!-- Unread Indicator (Blue Dot) -->
+                        <div
+                            x-show="doc.unread"
+                            class="w-2 h-2 bg-apple-blue rounded-full"
+                            title="Ungelesen"
+                        ></div>
+                        <!-- Flagged Indicator (Red Flag) -->
+                        <svg
+                            x-show="doc.flagged"
+                            class="w-4 h-4 text-apple-red"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            title="Markiert"
+                        >
+                            <path d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z"/>
+                        </svg>
+                    </div>
+
+                    <!-- Document Item -->
+                    <div class="flex items-start">
+                        <!-- Icon Indicator (only one) -->
+                        <div class="mr-3 mt-1">
+                            <!-- Archived Indicator (priority over recurring) -->
+                            <svg
+                                x-show="doc.is_archived && !doc.is_recurring_generated"
+                                class="w-4 h-4 text-apple-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                title="Archiviert"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                            </svg>
+                            <!-- Recurring Indicator (shows for recurring, whether archived or not) -->
+                            <svg
+                                x-show="doc.is_recurring_generated"
+                                class="w-4 h-4 text-apple-gray-500"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                title="Wiederkehrende Buchung"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <!-- Filename with Flag -->
+                            <div class="flex items-center gap-2">
+                                <p
+                                    :class="selectedDoc && selectedDoc.id === doc.id ? 'text-white' : 'text-apple-gray-900'"
+                                    class="text-sm font-medium truncate flex-1"
+                                    x-text="doc.description || doc.original_filename"
+                                ></p>
+                                <!-- Flag Icon -->
+                                <svg
+                                    x-show="doc.flagged"
+                                    :class="selectedDoc && selectedDoc.id === doc.id ? 'text-white' : 'text-apple-orange'"
+                                    class="w-4 h-4 flex-shrink-0"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                    title="Geflaggt"
+                                >
+                                    <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>
+                                </svg>
+                            </div>
+
+                            <!-- Metadata -->
+                            <div
+                                :class="selectedDoc && selectedDoc.id === doc.id ? 'text-white/80' : 'text-apple-gray-500'"
+                                class="text-xs mt-1 space-y-0.5"
+                            >
+                                <div x-show="doc.date" class="flex items-center">
+                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span x-text="doc.date"></span>
+                                </div>
+                                <div x-show="doc.amount" class="flex items-center font-medium text-apple-orange">
+                                    <span x-text="'-' + formatCurrency(doc.amount) + ' €'"></span>
+                                </div>
+                                <div x-show="doc.category">
+                                    <span
+                                        :class="selectedDoc && selectedDoc.id === doc.id ? 'bg-white/20 text-white' : getCategoryColor(doc.category)"
+                                        class="inline-block px-2 py-0.5 text-xs rounded font-medium"
+                                        x-text="doc.category"
+                                    ></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Empty State -->
+            <div x-show="filteredDocuments.length === 0" class="p-8 text-center">
+                <svg class="w-16 h-16 mx-auto text-apple-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <p class="mt-4 text-sm text-apple-gray-500">Keine Dokumente gefunden</p>
+            </div>
+        </div>
+
+        <!-- New Entry Button (Fixed at bottom) -->
+        <div class="p-3 border-t border-apple-gray-200">
+            <button
+                @click="showCreateModal = true"
+                class="w-full px-4 py-2 bg-apple-orange text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm flex items-center justify-center gap-2 shadow-sm"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Neue Ausgabe
+            </button>
+        </div>
+    </div>
+
+    <!-- Document Detail View (Right) - Split View -->
+    <div class="flex-1 flex flex-col bg-apple-gray-50" x-show="selectedDoc">
+
+        <!-- Document Header -->
+        <div class="px-6 py-4 bg-white border-b border-apple-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-apple-gray-900" x-text="selectedDoc ? (selectedDoc.description || selectedDoc.original_filename) : ''"></h3>
+                <div class="flex items-center space-x-2">
+                    <!-- Keyboard hint -->
+                    <span class="text-xs text-apple-gray-500">↑↓ Navigation • ⌘S Speichern</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Split View: PDF + Form -->
+        <div class="flex-1 flex overflow-hidden">
+
+            <!-- PDF Preview (Left 60%) -->
+            <div class="w-3/5 bg-apple-gray-50 flex items-center justify-center overflow-auto relative">
+                <!-- Upload Icon when no PDF exists -->
+                <div
+                    x-show="selectedDoc && (!selectedDoc.file_path || selectedDoc.file_path.endsWith('.virtual'))"
+                    class="text-center p-12"
+                >
+                    <svg class="w-32 h-32 mx-auto text-apple-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <h3 class="text-xl font-semibold text-apple-gray-700 mb-2">Keine PDF Datei vorhanden</h3>
+                    <p class="text-sm text-apple-gray-500 mb-6">Lade eine PDF-Datei hoch, um sie hier anzuzeigen</p>
+                    <button
+                        type="button"
+                        @click="$el.closest('.overflow-auto').querySelector('#file-upload-' + selectedDoc.id).click()"
+                        class="px-6 py-3 text-sm font-medium text-white bg-apple-blue rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                        <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                        </svg>
+                        PDF hochladen
+                    </button>
+                </div>
+
+                <!-- PDF Embed when file exists -->
+                <div
+                    x-show="selectedDoc && selectedDoc.file_path && !selectedDoc.file_path.endsWith('.virtual')"
+                    class="w-full h-full"
+                >
+                    <embed
+                        :src="selectedDoc ? '/file/' + selectedDoc.id : ''"
+                        type="application/pdf"
+                        class="w-full h-full"
+                    />
+                </div>
+            </div>
+
+            <!-- Metadata Form / Bulk Edit (Right 40%) -->
+            <div class="w-2/5 bg-white border-l border-apple-gray-200 overflow-y-auto">
+
+                <!-- Bulk Edit Panel -->
+                <div x-show="selectedDocs.length > 0" class="p-6 space-y-6">
+                    <!-- Header -->
+                    <div class="pb-4 border-b border-apple-gray-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <h2 class="text-2xl font-semibold text-apple-gray-900" x-text="selectedDocs.length + ' Buchungen ausgewählt'"></h2>
+                            <button @click="selectedDocs = []" class="text-apple-gray-500 hover:text-apple-gray-700">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-sm text-apple-gray-600">Mehrere Buchungen gleichzeitig bearbeiten</p>
+                    </div>
+
+                    <!-- AI Verarbeitung -->
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">LLM Model (Ollama)</label>
+                            <select x-model="bulkOcrModel" class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent">
+                                <template x-for="model in availableModels" :key="model.name">
+                                    <option :value="model.name" x-text="model.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <button
+                            @click="bulkReprocessOCR()"
+                            class="w-full px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                        >
+                            Mit LLM neu analysieren
+                        </button>
+                    </div>
+
+                    <!-- Felder ändern -->
+                    <div class="space-y-3">
+                        <!-- Betrag -->
+                        <div>
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Betrag ändern</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                x-model="bulkAmount"
+                                placeholder="z.B. 29.99"
+                                class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                            >
+                        </div>
+
+                        <!-- Beschreibung -->
+                        <div>
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Beschreibung ändern</label>
+                            <input
+                                type="text"
+                                x-model="bulkDescription"
+                                maxlength="50"
+                                placeholder="z.B. Büromaterial"
+                                class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                            >
+                        </div>
+
+                        <!-- Kategorie -->
+                        <div>
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Kategorie ändern</label>
+                            <select x-model="bulkCategory" class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent">
+                                <option value="">-- Kategorie wählen --</option>
+                                <template x-for="cat in categories" :key="cat">
+                                    <option :value="cat" x-text="cat"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Apply Button -->
+                        <button
+                            @click="bulkApplyChanges()"
+                            :disabled="!bulkAmount && !bulkDescription && !bulkCategory"
+                            :class="(bulkAmount || bulkDescription || bulkCategory) ? 'bg-apple-green hover:bg-green-600' : 'bg-apple-gray-300 cursor-not-allowed'"
+                            class="w-full px-4 py-2 text-white rounded-lg transition-colors font-medium"
+                        >
+                            Änderungen anwenden
+                        </button>
+                    </div>
+
+                    <!-- Status Actions -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <button
+                            @click="bulkMarkRead()"
+                            class="px-4 py-2 bg-white border border-apple-gray-200 text-apple-gray-700 rounded-lg hover:bg-apple-gray-50 transition-colors font-medium"
+                        >
+                            Gelesen
+                        </button>
+                        <button
+                            @click="bulkMarkUnread()"
+                            class="px-4 py-2 bg-white border border-apple-gray-200 text-apple-gray-700 rounded-lg hover:bg-apple-gray-50 transition-colors font-medium"
+                        >
+                            Ungelesen
+                        </button>
+                        <button
+                            @click="bulkFlag()"
+                            class="px-4 py-2 bg-apple-orange text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                        >
+                            Flaggen
+                        </button>
+                        <button
+                            @click="bulkUnflag()"
+                            class="px-4 py-2 bg-white border border-apple-gray-200 text-apple-gray-700 rounded-lg hover:bg-apple-gray-50 transition-colors font-medium"
+                        >
+                            Unflaggen
+                        </button>
+                    </div>
+
+                    <!-- Archive/Delete Actions -->
+                    <div class="pt-3 border-t border-apple-gray-200 space-y-2">
+                        <button
+                            @click="bulkArchive()"
+                            class="w-full px-4 py-2 bg-white border border-apple-gray-200 text-apple-gray-700 rounded-lg hover:bg-apple-gray-50 transition-colors font-medium"
+                        >
+                            Archivieren
+                        </button>
+                        <button
+                            @click="bulkDelete()"
+                            class="w-full px-4 py-2 bg-apple-red text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                        >
+                            Löschen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Normal Edit Form -->
+                <form x-show="selectedDocs.length === 0" @submit.prevent="saveDocument()" class="p-6 space-y-6">
+
+                    <!-- Date -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-gray-700 mb-2">Datum</label>
+                        <input
+                            type="date"
+                            x-model="selectedDoc.date"
+                            @change="scheduleAutoSave()"
+                            required
+                            class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                        >
+                    </div>
+
+                    <!-- Amount -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-gray-700 mb-2">Betrag (€)</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            x-model="selectedDoc.amount"
+                            @input="scheduleAutoSave()"
+                            required
+                            class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                        >
+                    </div>
+
+                    <!-- Category -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-gray-700 mb-2">Kategorie</label>
+                        <select
+                            x-model="selectedDoc.category"
+                            @change="scheduleAutoSave()"
+                            required
+                            class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                        >
+                            <option value="">Bitte wählen...</option>
+                            <template x-for="cat in categories" :key="cat">
+                                <option :value="cat" x-text="cat"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-gray-700 mb-2">Beschreibung</label>
+                        <input
+                            type="text"
+                            x-model="selectedDoc.description"
+                            @input="scheduleAutoSave()"
+                            maxlength="50"
+                            placeholder="z.B. Signa Projekt"
+                            class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                        >
+                    </div>
+
+                    <!-- File Upload/Download -->
+                    <div>
+                        <label class="block text-sm font-medium text-apple-gray-700 mb-2">Datei</label>
+                        <div class="flex items-center space-x-2">
+                            <!-- Download Button (if file exists) -->
+                            <button
+                                x-show="selectedDoc.file_path"
+                                type="button"
+                                @click="window.open('/file/' + selectedDoc.id, '_blank')"
+                                class="flex-1 px-4 py-2 text-sm font-medium text-apple-blue bg-apple-blue/10 border border-apple-blue/20 rounded-lg hover:bg-apple-blue/20 transition-colors"
+                            >
+                                <svg class="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                PDF öffnen
+                            </button>
+
+                            <!-- Upload Button -->
+                            <div class="flex-1">
+                                <input
+                                    type="file"
+                                    :id="'file-upload-' + selectedDoc.id"
+                                    @change="uploadFile($event)"
+                                    accept=".pdf,.jpg,.jpeg,.png,.heic"
+                                    class="hidden"
+                                >
+                                <button
+                                    type="button"
+                                    @click="$el.parentElement.querySelector('input').click()"
+                                    class="w-full px-4 py-2 text-sm font-medium text-apple-gray-700 bg-apple-gray-100 border border-apple-gray-200 rounded-lg hover:bg-apple-gray-200 transition-colors"
+                                >
+                                    <svg class="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                    </svg>
+                                    <span x-text="selectedDoc.file_path ? 'Ersetzen' : 'Hochladen'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OCR Text Preview -->
+                    <div x-show="selectedDoc && selectedDoc.ocr_text">
+                        <label class="block text-sm font-medium text-apple-gray-700 mb-2">OCR Text (Referenz)</label>
+                        <textarea
+                            x-model="selectedDoc.ocr_text"
+                            readonly
+                            rows="4"
+                            class="w-full px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg text-xs font-mono text-apple-gray-600 resize-none"
+                        ></textarea>
+                    </div>
+
+                    <!-- Auto-Save Status & Actions -->
+                    <div class="space-y-3">
+                        <!-- Auto-Save Status -->
+                        <div class="flex items-center space-x-2 text-sm">
+                            <span x-show="saving" class="text-apple-gray-500">Speichere...</span>
+                            <span x-show="!saving && lastSaved" class="text-apple-gray-400">
+                                Gespeichert <span x-text="lastSaved"></span>
+                            </span>
+                        </div>
+
+                        <!-- OCR Re-Process with Model Selection -->
+                        <div x-data="{ showModels: false, defaultModel: 'gemma3:4b' }" class="flex items-center space-x-2">
+                            <!-- Model Selection Dropdown (same width as Read button below) -->
+                            <div class="relative flex-1">
+                                <button
+                                    type="button"
+                                    @click="showModels = !showModels"
+                                    class="w-full px-4 py-2 text-sm font-medium rounded-lg hover:opacity-90 transition-colors bg-apple-gray-100 text-apple-gray-700 flex items-center justify-between"
+                                    title="Modell auswählen"
+                                >
+                                    <span x-text="defaultModel.split(':')[0]"></span>
+                                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+
+                                <!-- Model Selector Dropdown -->
+                                <div
+                                    x-show="showModels"
+                                    @click.away="showModels = false"
+                                    x-transition
+                                    class="absolute right-0 bottom-full mb-2 w-full min-w-[200px] bg-white rounded-lg shadow-xl border border-apple-gray-200 overflow-hidden z-50"
+                                    style="display: none;"
+                                >
+                                    <div class="px-3 py-2 bg-apple-gray-50 border-b border-apple-gray-200">
+                                        <p class="text-xs font-semibold text-apple-gray-700">LLM-Modell wählen</p>
+                                    </div>
+                                    <div class="max-h-64 overflow-y-auto">
+                                        <button
+                                            type="button"
+                                            @click="defaultModel = defaultModel; showModels = false"
+                                            class="w-full px-3 py-2 text-left text-sm hover:bg-apple-blue/10 transition-colors border-b border-apple-gray-100"
+                                        >
+                                            <span class="font-medium text-apple-gray-900" x-text="defaultModel.split(':')[0]"></span>
+                                            <span class="block text-xs text-apple-gray-500" x-text="'Standard: ' + defaultModel"></span>
+                                        </button>
+                                        <template x-for="model in availableModels" :key="model.name">
+                                            <button
+                                                type="button"
+                                                @click="defaultModel = model.name; showModels = false"
+                                                class="w-full px-3 py-2 text-left text-sm hover:bg-apple-blue/10 transition-colors"
+                                            >
+                                                <span class="font-medium text-apple-gray-900" x-text="model.display_name"></span>
+                                                <span class="block text-xs text-apple-gray-500" x-text="model.name"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="availableModels.length === 0" class="px-3 py-4 text-center text-xs text-apple-gray-500">
+                                            Keine weiteren Modelle verfügbar
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Scan Button (Icon only, right-aligned) -->
+                            <button
+                                type="button"
+                                @click="runOCR(defaultModel)"
+                                :disabled="processingOCR"
+                                class="px-4 py-2 text-sm font-medium rounded-lg hover:opacity-90 transition-colors disabled:opacity-50"
+                                :class="processingOCR ? 'bg-apple-gray-300 text-apple-gray-600' : 'bg-apple-gray-100 text-apple-gray-700'"
+                                :title="processingOCR ? 'Verarbeite...' : 'Dokument scannen'"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    :class="{'animate-spin': processingOCR}"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="space-y-2">
+                            <!-- Row 1: Read, Flag, Delete -->
+                            <div class="flex items-center space-x-2">
+                                <button
+                                    type="button"
+                                    @click="toggleRead()"
+                                    :class="selectedDoc.reviewed ? 'bg-apple-green text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                                    class="flex-1 px-4 py-2 text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+                                    title="Als gelesen markieren"
+                                >
+                                    <svg class="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span x-text="selectedDoc.reviewed ? 'Gelesen' : 'Als gelesen'"></span>
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="toggleFlag()"
+                                    :class="selectedDoc.flagged ? 'bg-apple-orange text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                                    class="px-4 py-2 text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+                                    title="Flagge setzen"
+                                >
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="deleteInvoice()"
+                                    class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                                    title="Löschen"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Row 2: Create Recurring -->
+                            <button
+                                type="button"
+                                @click="createRecurringFromDoc()"
+                                class="w-full px-3 py-1.5 text-xs font-medium text-apple-gray-600 bg-apple-gray-50 border border-apple-gray-200 rounded hover:bg-apple-gray-100 transition-colors"
+                                title="Wiederkehrende Buchung erstellen"
+                            >
+                                <svg class="w-3 h-3 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                Als wiederkehrend...
+                            </button>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Empty State (No document selected) -->
+    <div x-show="!selectedDoc" class="flex-1 flex items-center justify-center bg-apple-gray-50">
+        <div class="text-center">
+            <svg class="w-20 h-20 mx-auto text-apple-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p class="mt-4 text-sm text-apple-gray-500">Wähle ein Dokument aus der Liste</p>
+        </div>
+    </div>
+
+    <!-- Create Modal -->
+    <div
+        x-show="showCreateModal"
+        @click.self="showCreateModal = false"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        style="display: none;"
+    >
+        <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.stop>
+            <h2 class="text-xl font-bold mb-4">Neue Ausgabe</h2>
+
+            <form @submit.prevent="createNewEntry()" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Datum</label>
+                        <input type="date" x-model="newEntry.date" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Betrag (€)</label>
+                        <input type="number" step="0.01" x-model="newEntry.amount" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Kategorie</label>
+                    <select x-model="newEntry.category" required class="w-full px-3 py-2 border rounded-lg">
+                        <option value="">Bitte wählen...</option>
+                        <template x-for="cat in categories" :key="cat">
+                            <option :value="cat" x-text="cat"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Beschreibung</label>
+                    <input type="text" x-model="newEntry.description" required class="w-full px-3 py-2 border rounded-lg">
+                </div>
+
+                <!-- File Upload -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Datei (optional)</label>
+                    <input type="file" @change="handleNewEntryFile($event)" accept=".pdf,.jpg,.jpeg,.png,.heic" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    <p class="text-xs text-apple-gray-500 mt-1">PDF, JPG, PNG, HEIC</p>
+                </div>
+
+                <!-- Recurring Option -->
+                <div class="border-t pt-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="newEntry.is_recurring" class="w-4 h-4 text-apple-blue rounded">
+                        <span class="ml-2 font-medium">Wiederkehrende Buchung</span>
+                    </label>
+
+                    <div x-show="newEntry.is_recurring" class="mt-4 grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Wiederholung</label>
+                            <select x-model="newEntry.frequency" class="w-full px-3 py-2 border rounded-lg">
+                                <option value="monthly">Monatlich</option>
+                                <option value="quarterly">Vierteljährlich</option>
+                                <option value="yearly">Jährlich</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Am Tag</label>
+                            <input type="number" min="1" max="31" x-model="newEntry.day_of_month" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4">
+                    <button type="button" @click="showCreateModal = false" class="px-4 py-2 text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg">
+                        Abbrechen
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600">
+                        Erstellen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function inboxApp() {
+    return {
+        documents: {{ invoices | tojson }},
+        filteredDocuments: [],
+        selectedDoc: null,
+        selectedIndex: -1,
+        filter: 'all',
+        searchQuery: '',
+        selectedDocs: [],
+        showCreateModal: false,
+        newEntry: {
+            date: '',
+            amount: '',
+            category: '',
+            description: '',
+            is_recurring: false,
+            frequency: 'monthly',
+            day_of_month: 1
+        },
+        newEntryFile: null,
+        categories: [],
+        availableModels: [],
+        saving: false,
+        processingOCR: false,
+        lastSaved: '',
+        autoSaveTimer: null,
+        bulkOcrModel: '',
+        bulkCategory: '',
+        bulkAmount: '',
+        bulkDescription: '',
+
+        init() {
+            this.loadCategories();
+            this.loadOllamaModels();
+            this.filterDocuments();
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Arrow Up
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.selectPrevious();
+                }
+
+                // Arrow Down
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.selectNext();
+                }
+
+                // Cmd/Ctrl + S to save
+                if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                    e.preventDefault();
+                    if (this.selectedDoc) {
+                        this.saveDocument();
+                    }
+                }
+            });
+
+            // Auto-select first document
+            if (this.filteredDocuments.length > 0) {
+                this.selectDocument(this.filteredDocuments[0], 0);
+            }
+        },
+
+        filterDocuments() {
+            this.filteredDocuments = this.documents.filter(doc => {
+                // Filter by status/location FIRST
+                if (this.filter === 'unprocessed') {
+                    // Show only inbox items that are not reviewed
+                    if (doc.reviewed || doc.is_archived) {
+                        return false;
+                    }
+                } else if (this.filter === 'archived') {
+                    // Show only archived items
+                    if (!doc.is_archived) {
+                        return false;
+                    }
+                } else if (this.filter === 'flagged') {
+                    // Show only flagged items
+                    if (!doc.flagged) {
+                        return false;
+                    }
+                }
+                // 'all' shows everything - no filtering by status
+
+                // THEN filter by search query if present
+                if (this.searchQuery) {
+                    const query = this.searchQuery.toLowerCase();
+                    const searchText = [
+                        doc.description,
+                        doc.original_filename,
+                        doc.category,
+                        doc.date
+                    ].filter(Boolean).join(' ').toLowerCase();
+
+                    if (!searchText.includes(query)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // Sort chronologically (newest first)
+            this.filteredDocuments.sort((a, b) => {
+                const dateA = new Date(a.date || a.created_at || 0);
+                const dateB = new Date(b.date || b.created_at || 0);
+                return dateB - dateA; // Descending order (newest first)
+            });
+        },
+
+        handleDocumentClick(doc, index, event) {
+            if (event.shiftKey && this.selectedIndex !== null) {
+                // Shift+Click: Select range
+                const start = Math.min(this.selectedIndex, index);
+                const end = Math.max(this.selectedIndex, index);
+
+                // Clear current selection
+                this.selectedDocs = [];
+
+                // Select all documents in range
+                for (let i = start; i <= end; i++) {
+                    const docId = this.filteredDocuments[i].id;
+                    if (!this.selectedDocs.includes(docId)) {
+                        this.selectedDocs.push(docId);
+                    }
+                }
+
+                // Also select the document in detail view
+                this.selectDocument(doc, index);
+            } else if (event.metaKey || event.ctrlKey) {
+                // Cmd/Ctrl+Click: Toggle individual selection
+                this.toggleSelection(doc);
+                // Also select the document in detail view
+                this.selectDocument(doc, index);
+            } else {
+                // Normal click: Clear multi-selection and select document
+                this.selectedDocs = [];
+                this.selectDocument(doc, index);
+            }
+        },
+
+        selectDocument(doc, index) {
+            this.selectedDoc = doc;
+            this.selectedIndex = index;
+
+            // Auto-mark as read when opening (like mail program)
+            if (doc.unread) {
+                this.markAsRead();
+            }
+        },
+
+        selectNext() {
+            if (this.selectedIndex < this.filteredDocuments.length - 1) {
+                this.selectDocument(
+                    this.filteredDocuments[this.selectedIndex + 1],
+                    this.selectedIndex + 1
+                );
+            }
+        },
+
+        selectPrevious() {
+            if (this.selectedIndex > 0) {
+                this.selectDocument(
+                    this.filteredDocuments[this.selectedIndex - 1],
+                    this.selectedIndex - 1
+                );
+            }
+        },
+
+        async loadCategories() {
+            const response = await fetch('/api/categories');
+            this.categories = await response.json();
+        },
+
+        async loadOllamaModels() {
+            try {
+                const response = await fetch('/api/ollama/models');
+                const data = await response.json();
+                if (data.available) {
+                    this.availableModels = data.models;
+                    // Set gemma3:4b as default for bulk OCR, fallback to first model
+                    if (this.availableModels.length > 0) {
+                        const preferredModel = this.availableModels.find(m => m.name === 'gemma3:4b');
+                        this.bulkOcrModel = preferredModel ? preferredModel.name : this.availableModels[0].name;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load Ollama models:', error);
+            }
+        },
+
+        scheduleAutoSave() {
+            // Clear existing timer
+            if (this.autoSaveTimer) {
+                clearTimeout(this.autoSaveTimer);
+            }
+
+            // Schedule save after 1 second of inactivity
+            this.autoSaveTimer = setTimeout(() => {
+                this.saveDocument();
+            }, 1000);
+        },
+
+        async saveDocument() {
+            if (!this.selectedDoc || this.saving) return;
+
+            // Validate required fields before saving
+            if (!this.selectedDoc.date || !this.selectedDoc.amount || !this.selectedDoc.category) {
+                // Skip auto-save if required fields are missing
+                return;
+            }
+
+            this.saving = true;
+
+            try {
+                // Prepare data to save
+                const saveData = {
+                    date: this.selectedDoc.date,
+                    amount: parseFloat(this.selectedDoc.amount),
+                    category: this.selectedDoc.category,
+                    description: this.selectedDoc.description,
+                    reviewed: this.selectedDoc.reviewed,
+                    unread: this.selectedDoc.unread || false
+                };
+
+                // Auto-archive recurring bookings when complete
+                if (this.selectedDoc.is_recurring_generated &&
+                    this.selectedDoc.date && this.selectedDoc.amount && this.selectedDoc.category) {
+                    saveData.is_archived = true;
+                }
+
+                const response = await fetch(`/api/invoice/${this.selectedDoc.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(saveData)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Mark as reviewed and archived (if it was auto-archived)
+                    this.selectedDoc.reviewed = true;
+                    this.selectedDoc.invoice_id = result.invoice_id;
+                    if (saveData.is_archived) {
+                        this.selectedDoc.is_archived = true;
+                    }
+
+                    // Update last saved time
+                    const now = new Date();
+                    this.lastSaved = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+                    // Update badge counts
+                    updateBadges();
+                } else {
+                    this.showNotification('Fehler beim Speichern', 'error');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                this.showNotification('Fehler beim Speichern', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async runOCR(model = null) {
+            if (!this.selectedDoc || this.processingOCR) return;
+
+            this.processingOCR = true;
+
+            try {
+                let url = `/process/${this.selectedDoc.id}`;
+                if (model) {
+                    url += `?model=${encodeURIComponent(model)}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                // Update form with OCR results
+                this.selectedDoc.date = data.date || this.selectedDoc.date;
+                this.selectedDoc.amount = data.amount || this.selectedDoc.amount;
+                this.selectedDoc.category = data.category || this.selectedDoc.category;
+                this.selectedDoc.description = data.description || this.selectedDoc.description;
+                this.selectedDoc.ocr_text = data.text || this.selectedDoc.ocr_text;
+
+                const modelInfo = model ? ` (${model})` : '';
+                this.showNotification(`OCR aktualisiert${modelInfo}`, 'success');
+            } catch (error) {
+                console.error('OCR error:', error);
+                this.showNotification('OCR-Fehler', 'error');
+            } finally {
+                this.processingOCR = false;
+            }
+        },
+
+        showNotification(message, type) {
+            // Simple notification (you can enhance this with a toast library)
+            const colors = {
+                success: 'bg-apple-green',
+                error: 'bg-apple-red',
+                info: 'bg-apple-blue'
+            };
+
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 px-4 py-3 text-white rounded-lg shadow-lg ${colors[type]} z-50`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        },
+
+        get unprocessedCount() {
+            return this.documents.filter(d => !d.reviewed && !d.is_archived).length;
+        },
+
+        get archivedCount() {
+            return this.documents.filter(d => d.is_archived).length;
+        },
+
+        get flaggedCount() {
+            return this.documents.filter(d => d.flagged).length;
+        },
+
+        getCategoryColor(category) {
+            const colors = {
+                'Büro': 'bg-blue-100 text-blue-800',
+                'Raum': 'bg-purple-100 text-purple-800',
+                'Telefon': 'bg-green-100 text-green-800',
+                'Fahrtkosten': 'bg-orange-100 text-orange-800',
+                'Fortbildung': 'bg-red-100 text-red-800',
+                'Versicherung': 'bg-pink-100 text-pink-800',
+                'Porto': 'bg-yellow-100 text-yellow-800',
+                'Werbung': 'bg-indigo-100 text-indigo-800',
+                'Sonstiges': 'bg-gray-100 text-gray-800'
+            };
+            return colors[category] || 'bg-gray-100 text-gray-800';
+        },
+
+        async markAsRead() {
+            if (!this.selectedDoc) return;
+
+            try {
+                await fetch(`/api/invoice/${this.selectedDoc.id}/mark-read`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                // Update local state
+                this.selectedDoc.unread = false;
+
+                // Update badge counts
+                updateBadges();
+            } catch (error) {
+                console.error('Mark as read error:', error);
+            }
+        },
+
+        async toggleRead() {
+            if (!this.selectedDoc) return;
+
+            // Toggle reviewed status
+            this.selectedDoc.reviewed = !this.selectedDoc.reviewed;
+
+            // Sync unread with reviewed status
+            if (this.selectedDoc.reviewed) {
+                // Marking as reviewed -> set unread to false
+                this.selectedDoc.unread = false;
+            } else {
+                // Marking as unreviewed -> set unread to true
+                this.selectedDoc.unread = true;
+            }
+
+            // Save immediately (don't use scheduleAutoSave to avoid delay)
+            try {
+                await fetch(`/api/invoice/${this.selectedDoc.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reviewed: this.selectedDoc.reviewed,
+                        unread: this.selectedDoc.unread
+                    })
+                });
+                updateBadges();
+            } catch (error) {
+                console.error('Toggle read error:', error);
+            }
+        },
+
+        toggleSelection(doc) {
+            const index = this.selectedDocs.indexOf(doc.id);
+            if (index > -1) {
+                this.selectedDocs.splice(index, 1);
+            } else {
+                this.selectedDocs.push(doc.id);
+            }
+        },
+
+        async bulkMarkRead() {
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reviewed: true, unread: false })
+                    });
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc) {
+                        doc.reviewed = true;
+                        doc.unread = false;
+                    }
+                } catch (error) {
+                    console.error('Bulk mark read error:', error);
+                }
+            }
+            this.selectedDocs = [];
+            updateBadges();
+        },
+
+        async bulkMarkUnread() {
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ unread: true })
+                    });
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc) doc.unread = true;
+                } catch (error) {
+                    console.error('Bulk mark unread error:', error);
+                }
+            }
+            this.selectedDocs = [];
+            updateBadges();
+        },
+
+        async bulkFlag() {
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flagged: true })
+                    });
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc) doc.flagged = true;
+                } catch (error) {
+                    console.error('Bulk flag error:', error);
+                }
+            }
+            this.selectedDocs = [];
+        },
+
+        async bulkUnflag() {
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flagged: false })
+                    });
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc) doc.flagged = false;
+                } catch (error) {
+                    console.error('Bulk unflag error:', error);
+                }
+            }
+            this.selectedDocs = [];
+        },
+
+        async bulkReprocessOCR() {
+            if (!this.bulkOcrModel) {
+                alert('Bitte wählen Sie ein OCR-Model aus');
+                return;
+            }
+
+            if (!confirm(`${this.selectedDocs.length} Buchungen mit ${this.bulkOcrModel} neu verarbeiten?`)) {
+                return;
+            }
+
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}/process`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: this.bulkOcrModel })
+                    });
+                } catch (error) {
+                    console.error('Bulk OCR error:', error);
+                }
+            }
+
+            // Reload documents to get updated data
+            alert('OCR-Verarbeitung abgeschlossen');
+            location.reload();
+        },
+
+        async bulkChangeCategory() {
+            if (!this.bulkCategory) {
+                alert('Bitte wählen Sie eine Kategorie aus');
+                return;
+            }
+
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: this.bulkCategory })
+                    });
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc) doc.category = this.bulkCategory;
+                } catch (error) {
+                    console.error('Bulk category change error:', error);
+                }
+            }
+
+            this.selectedDocs = [];
+            this.bulkCategory = '';
+        },
+
+        async bulkApplyChanges() {
+            // Collect changes to apply
+            const changes = {};
+            if (this.bulkAmount) changes.amount = parseFloat(this.bulkAmount);
+            if (this.bulkDescription) changes.description = this.bulkDescription;
+            if (this.bulkCategory) changes.category = this.bulkCategory;
+
+            if (Object.keys(changes).length === 0) {
+                alert('Bitte geben Sie mindestens ein Feld zum Ändern an');
+                return;
+            }
+
+            const changesSummary = [];
+            if (changes.amount) changesSummary.push(`Betrag: ${changes.amount} €`);
+            if (changes.description) changesSummary.push(`Beschreibung: ${changes.description}`);
+            if (changes.category) changesSummary.push(`Kategorie: ${changes.category}`);
+
+            if (!confirm(`${this.selectedDocs.length} Buchungen ändern?\n\n${changesSummary.join('\n')}`)) {
+                return;
+            }
+
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(changes)
+                    });
+
+                    // Update local document
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc) {
+                        if (changes.amount) doc.amount = changes.amount;
+                        if (changes.description) doc.description = changes.description;
+                        if (changes.category) doc.category = changes.category;
+                    }
+                } catch (error) {
+                    console.error('Bulk apply changes error:', error);
+                }
+            }
+
+            // Reset bulk fields
+            this.selectedDocs = [];
+            this.bulkAmount = '';
+            this.bulkDescription = '';
+            this.bulkCategory = '';
+            this.filterDocuments();
+        },
+
+        async bulkArchive() {
+            if (!confirm(`${this.selectedDocs.length} Buchungen archivieren?`)) {
+                return;
+            }
+
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ is_archived: true })
+                    });
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc) doc.is_archived = true;
+                } catch (error) {
+                    console.error('Bulk archive error:', error);
+                }
+            }
+
+            this.selectedDocs = [];
+            this.filterDocuments();
+        },
+
+        async bulkDelete() {
+            if (!confirm(`${this.selectedDocs.length} Buchungen wirklich löschen? Dies kann nicht rückgängig gemacht werden!`)) {
+                return;
+            }
+
+            for (const docId of this.selectedDocs) {
+                try {
+                    await fetch(`/api/invoice/${docId}`, {
+                        method: 'DELETE'
+                    });
+                    const index = this.documents.findIndex(d => d.id === docId);
+                    if (index > -1) {
+                        this.documents.splice(index, 1);
+                    }
+                } catch (error) {
+                    console.error('Bulk delete error:', error);
+                }
+            }
+
+            this.selectedDocs = [];
+            this.filterDocuments();
+            updateBadges();
+        },
+
+        toggleFlag() {
+            if (!this.selectedDoc) return;
+            this.selectedDoc.flagged = !this.selectedDoc.flagged;
+            // Save flagged status to database
+            this.saveFlagStatus();
+        },
+
+        async saveFlagStatus() {
+            if (!this.selectedDoc) return;
+
+            try {
+                await fetch(`/api/invoice/${this.selectedDoc.id}/flag`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        flagged: this.selectedDoc.flagged
+                    })
+                });
+            } catch (error) {
+                console.error('Flag save error:', error);
+            }
+        },
+
+        async deleteInvoice() {
+            if (!this.selectedDoc) return;
+            if (!confirm('Diese Rechnung wirklich löschen?')) return;
+
+            try {
+                const response = await fetch(`/api/invoice/${this.selectedDoc.id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // Remove from documents list
+                    this.documents = this.documents.filter(d => d.id !== this.selectedDoc.id);
+                    this.filterDocuments();
+                    this.selectedDoc = null;
+                    this.selectedIndex = -1;
+                    this.showNotification('Gelöscht', 'success');
+                } else {
+                    this.showNotification('Fehler beim Löschen', 'error');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                this.showNotification('Fehler beim Löschen', 'error');
+            }
+        },
+
+        createRecurringFromDoc() {
+            if (!this.selectedDoc) return;
+
+            // Pre-fill newEntry with current document data
+            this.newEntry = {
+                date: this.selectedDoc.date || new Date().toISOString().split('T')[0],
+                amount: this.selectedDoc.amount || '',
+                category: this.selectedDoc.category || '',
+                description: this.selectedDoc.description || '',
+                is_recurring: true,  // Enable recurring by default
+                frequency: 'monthly',
+                day_of_month: new Date(this.selectedDoc.date || Date.now()).getDate()
+            };
+
+            // Open the create modal
+            this.showCreateModal = true;
+        },
+
+        async uploadFile(event) {
+            if (!this.selectedDoc) return;
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                this.showNotification('Datei wird hochgeladen...', 'info');
+
+                const response = await fetch(`/api/invoice/${this.selectedDoc.id}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Update local document path
+                    this.selectedDoc.file_path = result.file_path;
+
+                    // Update in documents list
+                    const docIndex = this.documents.findIndex(d => d.id === this.selectedDoc.id);
+                    if (docIndex !== -1) {
+                        this.documents[docIndex].file_path = result.file_path;
+                    }
+
+                    this.showNotification('Datei erfolgreich hochgeladen', 'success');
+
+                    // Reset file input
+                    event.target.value = '';
+                } else {
+                    const error = await response.json();
+                    this.showNotification(`Fehler: ${error.error || 'Upload fehlgeschlagen'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                this.showNotification('Fehler beim Hochladen', 'error');
+            }
+        },
+
+        handleNewEntryFile(event) {
+            this.newEntryFile = event.target.files[0] || null;
+        },
+
+        async createNewEntry() {
+            try {
+                // Get business_id from localStorage (same as getSelectedBusinessId in base template)
+                const savedId = localStorage.getItem('selectedBusinessId');
+                const business_id = savedId && savedId !== 'null' ? parseInt(savedId) : null;
+
+                if (this.newEntry.is_recurring) {
+                    // Create recurring transaction
+                    const response = await fetch('/api/recurring', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            business_id: business_id,
+                            type: 'expense',
+                            description: this.newEntry.description,
+                            amount: parseFloat(this.newEntry.amount),
+                            category: this.newEntry.category,
+                            frequency: this.newEntry.frequency,
+                            day_of_month: parseInt(this.newEntry.day_of_month),
+                            start_date: this.newEntry.date,
+                            active: true
+                        })
+                    });
+
+                    if (response.ok) {
+                        this.showNotification('Wiederkehrende Buchung erstellt', 'success');
+                        this.showCreateModal = false;
+                        // Trigger generation to create first entry
+                        await fetch('/api/recurring/generate', { method: 'POST' });
+                        window.location.reload();
+                    } else {
+                        const error = await response.json();
+                        this.showNotification(`Fehler: ${error.error || 'Unbekannter Fehler'}`, 'error');
+                    }
+                } else {
+                    // Create one-time entry (virtual invoice without PDF)
+                    const response = await fetch('/api/invoice', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            business_id: business_id,
+                            date: this.newEntry.date,
+                            amount: parseFloat(this.newEntry.amount),
+                            category: this.newEntry.category,
+                            description: this.newEntry.description,
+                            type: 'expense'
+                        })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+
+                        // Upload file if selected
+                        if (this.newEntryFile && result.id) {
+                            const formData = new FormData();
+                            formData.append('file', this.newEntryFile);
+
+                            await fetch(`/api/invoice/${result.id}/upload`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                        }
+
+                        this.showNotification('Erstellt', 'success');
+                        this.newEntryFile = null;
+                        window.location.reload();
+                    } else {
+                        const error = await response.json();
+                        this.showNotification(`Fehler: ${error.error || 'Unbekannter Fehler'}`, 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Create error:', error);
+                this.showNotification('Fehler beim Erstellen', 'error');
+            }
+        },
+
+        formatCurrency(num) {
+            // Format number with German thousand separators: 1.234,56
+            return (num || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        },
+
+        isPlaceholderPDF(doc) {
+            // Check if it's a generated placeholder PDF using database flag
+            return doc.is_placeholder_pdf === true || doc.is_placeholder_pdf === 1;
+        },
+
+        async uploadPDF(docId) {
+            // Create file input
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf';
+
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch(`/api/invoice/${docId}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        this.showNotification('PDF erfolgreich hochgeladen!', 'success');
+                        window.location.reload();
+                    } else {
+                        const error = await response.json();
+                        this.showNotification('Fehler beim Hochladen: ' + (error.error || 'Unbekannter Fehler'), 'error');
+                    }
+                } catch (error) {
+                    this.showNotification('Fehler beim Hochladen: ' + error.message, 'error');
+                }
+            };
+
+            input.click();
+        }
+    }
+}
+</script>
+
+{% endblock %}

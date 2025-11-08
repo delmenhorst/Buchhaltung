@@ -1,0 +1,359 @@
+{% extends "base_new.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="h-full overflow-auto bg-apple-gray-50" x-data="dashboardApp()">
+
+    <!-- Header -->
+    <div class="p-6 bg-white border-b border-apple-gray-200">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-semibold text-apple-gray-900">Dashboard</h1>
+                <p class="mt-1 text-sm text-apple-gray-600">Übersicht deiner Finanzen</p>
+            </div>
+            <!-- Year Selector -->
+            <div>
+                <label class="block text-xs font-medium text-apple-gray-600 mb-1">Steuerjahr</label>
+                <select
+                    onchange="window.location.href='/?year=' + this.value + (new URLSearchParams(window.location.search).get('business_id') ? '&business_id=' + new URLSearchParams(window.location.search).get('business_id') : '')"
+                    class="px-4 py-2 bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent text-sm font-medium"
+                >
+                    {% for y in stats.available_years %}
+                    <option value="{{ y }}" {% if y == stats.selected_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <!-- Monthly Income -->
+            <div class="bg-gradient-to-br from-apple-green to-green-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-white/70">Einnahmen (Monat)</p>
+                        <h2 class="text-3xl font-bold mt-1">{{ stats.monthly_income|currency }}</h2>
+                    </div>
+                    <div class="bg-white/20 p-3 rounded-lg">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Expenses -->
+            <div class="bg-gradient-to-br from-apple-orange to-orange-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-white/70">Ausgaben (Monat)</p>
+                        <h2 class="text-3xl font-bold mt-1">{{ stats.monthly_expenses|currency }}</h2>
+                    </div>
+                    <div class="bg-white/20 p-3 rounded-lg">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Profit -->
+            <div class="bg-gradient-to-br {% if stats.monthly_profit >= 0 %}from-apple-blue to-blue-600{% else %}from-apple-red to-red-600{% endif %} rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-white/70">Gewinn/Verlust (Monat)</p>
+                        <h2 class="text-3xl font-bold mt-1">{{ stats.monthly_profit|currency }}</h2>
+                    </div>
+                    <div class="bg-white/20 p-3 rounded-lg">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Reviews -->
+            <div class="bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-white/70">Ausstehend</p>
+                        <h2 class="text-3xl font-bold mt-1">{{ stats.pending_reviews }}</h2>
+                        <p class="text-xs text-white/70 mt-1">Belege zur Prüfung</p>
+                    </div>
+                    <div class="bg-white/20 p-3 rounded-lg">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Yearly Overview -->
+        <div class="bg-white rounded-xl shadow-sm border border-apple-gray-200 p-6 mb-6">
+            <h2 class="text-xl font-semibold text-apple-gray-900 mb-6">Jahresübersicht {{ stats.selected_year }}</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <p class="text-sm text-apple-gray-600 mb-2">Gesamt Einnahmen</p>
+                    <h3 class="text-3xl font-bold text-apple-green">{{ stats.yearly_income|currency }}</h3>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm text-apple-gray-600 mb-2">Gesamt Ausgaben</p>
+                    <h3 class="text-3xl font-bold text-apple-orange">{{ stats.yearly_expenses|currency }}</h3>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm text-apple-gray-600 mb-2">Gewinn/Verlust</p>
+                    <h3 class="text-3xl font-bold {% if stats.yearly_profit >= 0 %}text-apple-green{% else %}text-apple-red{% endif %}">
+                        {{ stats.yearly_profit|currency }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Income vs Expenses Chart -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-apple-gray-200 p-6">
+                <h3 class="text-lg font-semibold text-apple-gray-900 mb-4">Einnahmen vs Ausgaben</h3>
+                <canvas id="incomeExpensesChart" height="120"></canvas>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="bg-white rounded-xl shadow-sm border border-apple-gray-200 p-6">
+                <h3 class="text-lg font-semibold text-apple-gray-900 mb-4">Top Ausgaben-Kategorien</h3>
+                <canvas id="expensesCategoryChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-xl shadow-sm border border-apple-gray-200 overflow-hidden">
+            <div class="p-6 bg-apple-gray-50 border-b border-apple-gray-200 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-apple-gray-900">Letzte Aktivitäten</h3>
+                <a href="/documents" class="px-4 py-2 text-sm font-medium text-apple-blue bg-apple-blue/10 rounded-lg hover:bg-apple-blue/20 transition-colors">
+                    Alle anzeigen
+                </a>
+            </div>
+
+            {% if stats.recent_activity %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-apple-gray-50 border-b border-apple-gray-200">
+                        <tr class="text-left text-xs font-medium text-apple-gray-600 uppercase tracking-wider">
+                            <th class="px-6 py-3">Datum</th>
+                            <th class="px-6 py-3">Kennung</th>
+                            <th class="px-6 py-3">Typ</th>
+                            <th class="px-6 py-3">Kategorie</th>
+                            <th class="px-6 py-3">Beschreibung</th>
+                            <th class="px-6 py-3 text-right">Betrag</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-apple-gray-200">
+                        {% for item in stats.recent_activity %}
+                        <tr class="hover:bg-apple-gray-50 transition-colors">
+                            <td class="px-6 py-4 text-sm text-apple-gray-900">{{ item.date }}</td>
+                            <td class="px-6 py-4">
+                                <span class="inline-block px-2 py-1 text-xs font-medium rounded {% if item.invoice_id and item.invoice_id.startswith('ERE') %}bg-apple-green/10 text-apple-green{% else %}bg-apple-orange/10 text-apple-orange{% endif %}">
+                                    {{ item.invoice_id or '-' }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                {% if item.invoice_id and item.invoice_id.startswith('ERE') %}
+                                <span class="text-apple-green font-medium">Einnahme</span>
+                                {% else %}
+                                <span class="text-apple-orange font-medium">Ausgabe</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-apple-gray-700">{{ item.category or '-' }}</td>
+                            <td class="px-6 py-4 text-sm text-apple-gray-900">{{ item.description or '-' }}</td>
+                            <td class="px-6 py-4 text-right text-sm font-semibold text-apple-gray-900">
+                                {{ item.amount|currency }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-12 text-center">
+                <svg class="w-20 h-20 mx-auto text-apple-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <p class="mt-4 text-sm text-apple-gray-500">Noch keine verarbeiteten Belege vorhanden.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+function dashboardApp() {
+    return {
+        init() {
+            this.initCharts();
+        },
+
+        initCharts() {
+            // Income vs Expenses Chart
+            const incomeExpensesCtx = document.getElementById('incomeExpensesChart').getContext('2d');
+            new Chart(incomeExpensesCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Monat', 'Jahr', 'Gesamt'],
+                    datasets: [
+                        {
+                            label: 'Einnahmen',
+                            data: [
+                                {{ stats.monthly_income }},
+                                {{ stats.yearly_income }},
+                                {{ stats.total_income }}
+                            ],
+                            backgroundColor: '#34C759',
+                            borderRadius: 8,
+                            borderSkipped: false,
+                        },
+                        {
+                            label: 'Ausgaben',
+                            data: [
+                                {{ stats.monthly_expenses }},
+                                {{ stats.yearly_expenses }},
+                                {{ stats.total_expenses }}
+                            ],
+                            backgroundColor: '#FF9500',
+                            borderRadius: 8,
+                            borderSkipped: false,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('de-DE') + ' €';
+                                }
+                            },
+                            grid: {
+                                color: '#F5F5F7'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 13,
+                                    family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1D1D1F',
+                            titleFont: {
+                                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto'
+                            },
+                            bodyFont: {
+                                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto'
+                            },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' +
+                                           context.parsed.y.toLocaleString('de-DE', {
+                                               minimumFractionDigits: 2,
+                                               maximumFractionDigits: 2
+                                           }) + ' €';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Expenses Category Chart (Donut)
+            const expensesCategoryCtx = document.getElementById('expensesCategoryChart').getContext('2d');
+            new Chart(expensesCategoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [
+                        {% for cat in stats.expenses_by_category[:5] %}
+                        '{{ cat.category }}'{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    datasets: [{
+                        data: [
+                            {% for cat in stats.expenses_by_category[:5] %}
+                            {{ cat.total }}{% if not loop.last %},{% endif %}
+                            {% endfor %}
+                        ],
+                        backgroundColor: [
+                            '#FF3B30',
+                            '#FF9500',
+                            '#FFCC00',
+                            '#34C759',
+                            '#007AFF'
+                        ],
+                        borderWidth: 0,
+                        spacing: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 12,
+                                    family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1D1D1F',
+                            titleFont: {
+                                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto'
+                            },
+                            bodyFont: {
+                                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto'
+                            },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed.toLocaleString('de-DE', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    });
+                                    return label + ': ' + value + ' €';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

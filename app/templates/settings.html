@@ -1,0 +1,369 @@
+{% extends "base_new.html" %}
+
+{% block page_title %}Einstellungen{% endblock %}
+
+{% block content %}
+<div class="h-full overflow-auto bg-apple-gray-50" x-data="settingsApp()">
+
+    <!-- Header -->
+    <div class="p-6 bg-white border-b border-apple-gray-200">
+        <h1 class="text-3xl font-semibold text-apple-gray-900">Einstellungen</h1>
+        <p class="mt-1 text-sm text-apple-gray-600">Verwalte deine Businesses und App-Einstellungen</p>
+    </div>
+
+    <div class="p-6">
+        <!-- Businesses Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-apple-gray-200 overflow-hidden">
+            <div class="p-6 bg-apple-gray-50 border-b border-apple-gray-200 flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold text-apple-gray-900">Businesses</h2>
+                    <p class="mt-1 text-sm text-apple-gray-600">Verwalte deine verschiedenen Freelance-Geschäfte</p>
+                </div>
+                <button
+                    @click="showCreateModal = true"
+                    class="px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Neues Business
+                </button>
+            </div>
+
+            <!-- Business List -->
+            <div class="divide-y divide-apple-gray-200">
+                <template x-for="business in businesses" :key="business.id">
+                    <div class="p-6 hover:bg-apple-gray-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <!-- Color Indicator -->
+                                <div
+                                    class="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                                    :style="'background: ' + business.color">
+                                    <span x-text="business.prefix"></span>
+                                </div>
+
+                                <!-- Business Info -->
+                                <div>
+                                    <h3 class="text-lg font-semibold text-apple-gray-900" x-text="business.name"></h3>
+                                    <div class="flex items-center gap-4 mt-1 text-sm text-apple-gray-600">
+                                        <span>Präfix: <code x-text="business.prefix" class="px-2 py-0.5 bg-apple-gray-100 rounded"></code></span>
+                                        <span>Inbox: <code x-text="'Inbox/' + business.name" class="text-xs"></code></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex items-center gap-2">
+                                <button
+                                    @click="editBusiness(business)"
+                                    class="px-3 py-2 text-sm text-apple-blue hover:bg-apple-blue/10 rounded-lg transition-colors">
+                                    Bearbeiten
+                                </button>
+                                <button
+                                    @click="deleteBusiness(business.id)"
+                                    class="px-3 py-2 text-sm text-apple-red hover:bg-apple-red/10 rounded-lg transition-colors">
+                                    Löschen
+                                </button>
+                                <button
+                                    @click="openInFinder(business)"
+                                    class="px-3 py-2 text-sm text-apple-gray-700 hover:bg-apple-gray-100 rounded-lg transition-colors flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                                    </svg>
+                                    Ordner öffnen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Empty State -->
+                <div x-show="businesses.length === 0" class="p-12 text-center">
+                    <svg class="w-20 h-20 mx-auto text-apple-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    <p class="mt-4 text-sm text-apple-gray-500">Noch keine Businesses angelegt</p>
+                    <button
+                        @click="showCreateModal = true"
+                        class="mt-4 px-4 py-2 text-sm text-apple-blue hover:bg-apple-blue/10 rounded-lg transition-colors">
+                        Erstes Business erstellen
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Folder Structure Info -->
+        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div class="text-sm text-blue-900">
+                    <p class="font-semibold mb-2">Ordnerstruktur</p>
+                    <p class="mb-2">Wenn du ein neues Business anlegst, erstellt die App automatisch:</p>
+                    <ul class="list-disc list-inside space-y-1 text-blue-800 ml-4">
+                        <li><code class="bg-blue-100 px-1 rounded">Inbox/{BusinessName}/</code> - Hier wirfst du neue Dateien rein</li>
+                        <li><code class="bg-blue-100 px-1 rounded">Archive/{BusinessName}/Ausgaben/2025/</code> - Verarbeitete Ausgaben</li>
+                        <li><code class="bg-blue-100 px-1 rounded">Archive/{BusinessName}/Einnahmen/2025/</code> - Verarbeitete Einnahmen</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div
+        x-show="showCreateModal"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+        @click.self="closeModal()">
+
+        <div
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            x-transition:enter="transition ease-out duration-200 transform"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-150 transform"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95">
+
+            <div class="p-6 border-b border-apple-gray-200">
+                <h3 class="text-xl font-semibold text-apple-gray-900" x-text="editingBusiness ? 'Business bearbeiten' : 'Neues Business'"></h3>
+            </div>
+
+            <form @submit.prevent="saveBusiness()" class="p-6 space-y-4">
+                <!-- Name -->
+                <div>
+                    <label class="block text-sm font-medium text-apple-gray-700 mb-2">Business Name</label>
+                    <input
+                        type="text"
+                        x-model="formData.name"
+                        required
+                        placeholder="z.B. Medienkunst"
+                        class="w-full px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-blue focus:border-apple-blue">
+                </div>
+
+                <!-- Prefix -->
+                <div>
+                    <label class="block text-sm font-medium text-apple-gray-700 mb-2">Präfix für Kennungen</label>
+                    <input
+                        type="text"
+                        x-model="formData.prefix"
+                        required
+                        maxlength="4"
+                        placeholder="z.B. MK"
+                        class="w-full px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-blue focus:border-apple-blue uppercase">
+                    <p class="mt-1 text-xs text-apple-gray-500">Wird verwendet für: ARE-<span x-text="formData.prefix || 'XX'"></span>-2025001</p>
+                </div>
+
+                <!-- Color -->
+                <div>
+                    <label class="block text-sm font-medium text-apple-gray-700 mb-2">Farbe</label>
+                    <div class="flex gap-2">
+                        <template x-for="color in colorOptions" :key="color">
+                            <button
+                                type="button"
+                                @click="formData.color = color"
+                                :class="{'ring-2 ring-offset-2': formData.color === color}"
+                                :style="'background: ' + color"
+                                class="w-10 h-10 rounded-lg transition-all">
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex gap-3 pt-4">
+                    <button
+                        type="button"
+                        @click="closeModal()"
+                        class="flex-1 px-4 py-2 border border-apple-gray-300 text-apple-gray-700 rounded-lg hover:bg-apple-gray-50 transition-colors">
+                        Abbrechen
+                    </button>
+                    <button
+                        type="submit"
+                        class="flex-1 px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-medium">
+                        <span x-text="editingBusiness ? 'Speichern' : 'Erstellen'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function settingsApp() {
+    return {
+        businesses: [],
+        showCreateModal: false,
+        editingBusiness: null,
+        formData: {
+            name: '',
+            prefix: '',
+            color: '#007AFF'
+        },
+        colorOptions: [
+            '#007AFF', // Apple Blue
+            '#34C759', // Apple Green
+            '#FF9500', // Apple Orange
+            '#FF3B30', // Apple Red
+            '#5856D6', // Apple Purple
+            '#AF52DE', // Apple Magenta
+            '#FF2D55', // Apple Pink
+            '#5AC8FA', // Apple Teal
+        ],
+
+        async init() {
+            await this.loadBusinesses();
+        },
+
+        async loadBusinesses() {
+            try {
+                const response = await fetch('/api/businesses');
+                this.businesses = await response.json();
+            } catch (error) {
+                console.error('Failed to load businesses:', error);
+                showToast('Fehler beim Laden der Businesses', 'error');
+            }
+        },
+
+        async saveBusiness() {
+            // Convert prefix to uppercase
+            this.formData.prefix = this.formData.prefix.toUpperCase();
+
+            try {
+                const url = this.editingBusiness
+                    ? `/api/businesses/${this.editingBusiness.id}`
+                    : '/api/businesses';
+
+                const method = this.editingBusiness ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(this.formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    await this.loadBusinesses();
+                    this.closeModal();
+                    showToast(this.editingBusiness ? 'Business aktualisiert!' : 'Business erstellt!', 'success');
+
+                    // Notify other components (like business selector in navigation)
+                    window.dispatchEvent(new CustomEvent('businesses-updated'));
+                } else {
+                    showToast('Fehler: ' + (data.error || 'Unbekannter Fehler'), 'error');
+                }
+            } catch (error) {
+                console.error('Failed to save business:', error);
+                showToast('Fehler beim Speichern', 'error');
+            }
+        },
+
+        editBusiness(business) {
+            this.editingBusiness = business;
+            this.formData = {
+                name: business.name,
+                prefix: business.prefix,
+                color: business.color
+            };
+            this.showCreateModal = true;
+        },
+
+        async deleteBusiness(id) {
+            // First check if business has invoices
+            const business = this.businesses.find(b => b.id === id);
+
+            try {
+                // Try to count invoices (we'll check in the error response)
+                const testResponse = await fetch(`/api/businesses/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const testData = await testResponse.json();
+
+                if (testResponse.ok) {
+                    // No invoices, simple delete succeeded
+                    await this.loadBusinesses();
+                    showToast('Business gelöscht!', 'success');
+
+                    // Notify other components
+                    window.dispatchEvent(new CustomEvent('businesses-updated'));
+                    return;
+                }
+
+                // Check if error is about invoices
+                if (testData.error && testData.error.includes('invoices still associated')) {
+                    // Extract invoice count from error message
+                    const match = testData.error.match(/(\d+) invoices/);
+                    const count = match ? match[1] : '?';
+
+                    // Show CASCADE option dialog
+                    const choice = confirm(
+                        `⚠️ ACHTUNG: Dieses Business hat ${count} zugeordnete Rechnungen!\n\n` +
+                        `Was möchten Sie tun?\n\n` +
+                        `OK = ALLES LÖSCHEN (Business + alle ${count} Rechnungen + Dateien)\n` +
+                        `Abbrechen = Nichts löschen\n\n` +
+                        `⚠️ Diese Aktion kann NICHT rückgängig gemacht werden!`
+                    );
+
+                    if (!choice) {
+                        return; // User cancelled
+                    }
+
+                    // User confirmed CASCADE DELETE
+                    const cascadeResponse = await fetch(`/api/businesses/${id}?cascade=true`, {
+                        method: 'DELETE'
+                    });
+
+                    const cascadeData = await cascadeResponse.json();
+
+                    if (cascadeResponse.ok) {
+                        await this.loadBusinesses();
+                        showToast(`Business und alle ${count} Rechnungen wurden gelöscht!`, 'success');
+
+                        // Notify other components
+                        window.dispatchEvent(new CustomEvent('businesses-updated'));
+                    } else {
+                        showToast('Fehler beim Löschen: ' + (cascadeData.error || 'Unbekannter Fehler'), 'error');
+                    }
+                } else {
+                    // Some other error
+                    showToast('Fehler: ' + (testData.error || 'Unbekannter Fehler'), 'error');
+                }
+
+            } catch (error) {
+                console.error('Failed to delete business:', error);
+                showToast('Fehler beim Löschen: ' + error.message, 'error');
+            }
+        },
+
+        closeModal() {
+            this.showCreateModal = false;
+            this.editingBusiness = null;
+            this.formData = {
+                name: '',
+                prefix: '',
+                color: '#007AFF'
+            };
+        },
+
+        openInFinder(business) {
+            // This would require a backend endpoint to open Finder
+            // For now, just show the path
+            showToast(`Inbox: Inbox/${business.name}/\nArchive: Archive/${business.name}/`, 'info');
+        }
+    }
+}
+</script>
+{% endblock %}

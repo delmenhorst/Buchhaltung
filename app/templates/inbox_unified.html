@@ -1,0 +1,585 @@
+{% extends "base_new.html" %}
+
+{% block page_title %}Inbox{% endblock %}
+
+{% block content %}
+<div class="h-full flex flex-col bg-apple-gray-50" x-data="inboxApp()">
+
+    <!-- Header with Scan Button -->
+    <div class="p-6 bg-white border-b border-apple-gray-200 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-semibold text-apple-gray-900">Inbox</h1>
+            <p class="mt-1 text-sm text-apple-gray-600">Neue Dokumente verarbeiten</p>
+        </div>
+        <button
+            @click="scanInbox()"
+            :disabled="scanning"
+            class="px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2 disabled:opacity-50">
+            <svg class="w-5 h-5" :class="{'animate-spin': scanning}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span x-text="scanning ? 'Scanne...' : 'Inbox scannen'"></span>
+        </button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- Document List (Left Sidebar) -->
+        <div class="w-96 bg-white border-r border-apple-gray-200 flex flex-col">
+            <!-- Business Filter Tabs -->
+            <div class="p-4 border-b border-apple-gray-200 bg-apple-gray-50">
+                <div class="flex gap-2 flex-wrap">
+                    <button
+                        @click="selectedBusiness = null"
+                        :class="selectedBusiness === null ? 'bg-apple-blue text-white' : 'bg-white text-apple-gray-700 hover:bg-apple-gray-100'"
+                        class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                        Alle (<span x-text="documents.length"></span>)
+                    </button>
+                    <template x-for="business in businesses" :key="business.id">
+                        <button
+                            @click="selectedBusiness = business.id"
+                            :class="selectedBusiness === business.id ? 'text-white' : 'bg-white text-apple-gray-700 hover:bg-apple-gray-100'"
+                            :style="selectedBusiness === business.id ? 'background: ' + business.color : ''"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                            <span x-text="business.name"></span>
+                            (<span x-text="getBusinessDocCount(business.id)"></span>)
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Document Items -->
+            <div class="flex-1 overflow-y-auto">
+                <template x-for="doc in filteredDocuments" :key="doc.id">
+                    <div
+                        @click="selectDocument(doc)"
+                        :class="selectedDoc && selectedDoc.id === doc.id ? 'bg-apple-blue/10 border-l-4 border-apple-blue' : 'border-l-4 border-transparent hover:bg-apple-gray-50'"
+                        class="p-4 cursor-pointer border-b border-apple-gray-100 transition-colors">
+
+                        <!-- Business Badge -->
+                        <div class="flex items-center gap-2 mb-2">
+                            <span
+                                :style="'background: ' + doc.business.color"
+                                class="px-2 py-0.5 rounded text-xs font-medium text-white"
+                                x-text="doc.business.name">
+                            </span>
+                            <span x-show="doc.reviewed" class="text-xs text-apple-green">✓ Verarbeitet</span>
+                        </div>
+
+                        <!-- Filename -->
+                        <div class="font-medium text-apple-gray-900 text-sm truncate" x-text="doc.filename"></div>
+
+                        <!-- Meta Info -->
+                        <div class="mt-1 text-xs text-apple-gray-500 flex items-center gap-2">
+                            <span x-text="formatFileSize(doc.size)"></span>
+                            <span>•</span>
+                            <span x-text="formatDate(doc.created_at)"></span>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Empty State -->
+                <div x-show="filteredDocuments.length === 0" class="p-12 text-center">
+                    <svg class="w-20 h-20 mx-auto text-apple-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <p class="mt-4 text-sm text-apple-gray-500">Keine Dokumente in der Inbox</p>
+                    <p class="mt-2 text-xs text-apple-gray-400">
+                        Lege Dateien in <code class="bg-apple-gray-100 px-1 rounded">Inbox/{BusinessName}/</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Viewer & Form (Right) -->
+        <div x-show="selectedDoc" class="flex-1 flex">
+            <!-- PDF Preview (60%) -->
+            <div class="w-3/5 bg-apple-gray-900 p-6 flex flex-col">
+                <div class="flex-1 bg-white rounded-lg overflow-hidden">
+                    <embed
+                        :src="selectedDoc ? '/file/' + selectedDoc.id : ''"
+                        type="application/pdf"
+                        class="w-full h-full">
+                </div>
+            </div>
+
+            <!-- Metadata Form (40%) -->
+            <div class="w-2/5 bg-white p-6 overflow-y-auto">
+                <template x-if="selectedDoc">
+                    <form @submit.prevent="saveDocument()">
+                        <h2 class="text-xl font-semibold text-apple-gray-900 mb-6">Dokument verarbeiten</h2>
+
+                        <!-- Document Type -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Typ</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    @click="formData.type = 'expense'"
+                                    :class="formData.type === 'expense' ? 'bg-apple-orange text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                                    class="px-4 py-2 rounded-lg font-medium transition-colors">
+                                    Ausgabe
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="formData.type = 'income'"
+                                    :class="formData.type === 'income' ? 'bg-apple-green text-white' : 'bg-apple-gray-100 text-apple-gray-700'"
+                                    class="px-4 py-2 rounded-lg font-medium transition-colors">
+                                    Einnahme
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Process Button -->
+                        <button
+                            type="button"
+                            @click="processWithOCR()"
+                            :disabled="processing"
+                            class="w-full mb-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+                            <svg class="w-5 h-5" :class="{'animate-spin': processing}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            <span x-text="processing ? 'Verarbeite...' : 'OCR + AI Extraktion'"></span>
+                        </button>
+
+                        <!-- Date -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Datum</label>
+                            <input
+                                type="date"
+                                x-model="formData.date"
+                                required
+                                class="w-full px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-blue focus:border-apple-blue">
+                        </div>
+
+                        <!-- Amount -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Betrag (€)</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                x-model="formData.amount"
+                                required
+                                class="w-full px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-blue focus:border-apple-blue">
+                        </div>
+
+                        <!-- Category -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Kategorie</label>
+                            <select
+                                x-model="formData.category"
+                                required
+                                class="w-full px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-blue focus:border-apple-blue">
+                                <option value="">Bitte wählen...</option>
+                                <template x-for="cat in categories" :key="cat">
+                                    <option :value="cat" x-text="cat"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-apple-gray-700 mb-2">Beschreibung</label>
+                            <textarea
+                                x-model="formData.description"
+                                rows="3"
+                                class="w-full px-4 py-2 border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-blue focus:border-apple-blue"></textarea>
+                        </div>
+
+                        <!-- Income-specific fields -->
+                        <template x-if="formData.type === 'income'">
+                            <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                                <h4 class="text-sm font-semibold text-green-900 mb-3">Einnahmen-Details</h4>
+
+                                <!-- Invoice Number -->
+                                <div class="mb-3">
+                                    <label class="block text-xs font-medium text-apple-gray-700 mb-1">Rechnungsnummer</label>
+                                    <input
+                                        type="text"
+                                        x-model="formData.invoice_number"
+                                        placeholder="z.B. RE-2025-001"
+                                        class="w-full px-3 py-2 text-sm border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-green focus:border-apple-green">
+                                </div>
+
+                                <!-- Customer Name -->
+                                <div class="mb-3">
+                                    <label class="block text-xs font-medium text-apple-gray-700 mb-1">Kunde</label>
+                                    <input
+                                        type="text"
+                                        x-model="formData.customer_name"
+                                        placeholder="Kundenname"
+                                        class="w-full px-3 py-2 text-sm border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-green focus:border-apple-green">
+                                </div>
+
+                                <!-- Tax Rate & Amount -->
+                                <div class="grid grid-cols-2 gap-2 mb-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-apple-gray-700 mb-1">MwSt. %</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            x-model="formData.tax_rate"
+                                            @input="calculateTax()"
+                                            placeholder="19"
+                                            class="w-full px-3 py-2 text-sm border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-green focus:border-apple-green">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-apple-gray-700 mb-1">MwSt. €</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            x-model="formData.tax_amount"
+                                            readonly
+                                            class="w-full px-3 py-2 text-sm border border-apple-gray-300 rounded-lg bg-gray-50">
+                                    </div>
+                                </div>
+
+                                <!-- Payment Terms -->
+                                <div class="mb-3">
+                                    <label class="block text-xs font-medium text-apple-gray-700 mb-1">Zahlungsziel</label>
+                                    <input
+                                        type="date"
+                                        x-model="formData.payment_due_date"
+                                        class="w-full px-3 py-2 text-sm border border-apple-gray-300 rounded-lg focus:ring-2 focus:ring-apple-green focus:border-apple-green">
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Action Buttons -->
+                        <div class="flex gap-2 mb-4">
+                            <button
+                                type="submit"
+                                :disabled="saving"
+                                class="flex-1 px-4 py-2 bg-apple-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-medium disabled:opacity-50">
+                                <span x-text="saving ? 'Speichere...' : 'Speichern & Archivieren'"></span>
+                            </button>
+
+                            <button
+                                type="button"
+                                @click="deleteDocument()"
+                                :disabled="deleting"
+                                class="px-4 py-2 bg-apple-red text-white rounded-lg hover:bg-red-600 transition-colors font-medium disabled:opacity-50">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Archive Info -->
+                        <div class="mt-4 p-3 bg-blue-50 rounded-lg text-xs text-blue-900">
+                            <p class="font-medium mb-1">Wird archiviert nach:</p>
+                            <code class="text-blue-700" x-text="getArchivePath()"></code>
+                        </div>
+                    </form>
+                </template>
+            </div>
+        </div>
+
+        <!-- Empty Selection State -->
+        <div x-show="!selectedDoc" class="flex-1 flex items-center justify-center bg-apple-gray-50">
+            <div class="text-center text-apple-gray-400">
+                <svg class="w-24 h-24 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <p class="mt-4 text-lg">Wähle ein Dokument aus</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function inboxApp() {
+    return {
+        documents: [],
+        businesses: [],
+        selectedDoc: null,
+        selectedBusiness: null,
+        categories: [],
+        scanning: false,
+        processing: false,
+        saving: false,
+        deleting: false,
+        formData: {
+            type: 'expense',
+            date: new Date().toISOString().split('T')[0],
+            amount: '',
+            category: '',
+            description: '',
+            // Income-specific fields
+            invoice_number: '',
+            customer_name: '',
+            customer_address: '',
+            payment_due_date: '',
+            payment_terms: '',
+            tax_rate: 19,
+            tax_amount: 0,
+            net_amount: 0
+        },
+
+        async init() {
+            await this.loadBusinesses();
+            await this.loadDocuments();
+            await this.loadCategories();
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp' && this.filteredDocuments.length) {
+                    e.preventDefault();
+                    this.selectPrevious();
+                }
+                if (e.key === 'ArrowDown' && this.filteredDocuments.length) {
+                    e.preventDefault();
+                    this.selectNext();
+                }
+                if ((e.metaKey || e.ctrlKey) && e.key === 's' && this.selectedDoc) {
+                    e.preventDefault();
+                    this.saveDocument();
+                }
+            });
+        },
+
+        async loadBusinesses() {
+            const response = await fetch('/api/businesses');
+            this.businesses = await response.json();
+        },
+
+        async loadDocuments() {
+            const response = await fetch('/api/inbox');
+            this.documents = await response.json();
+
+            // Select first document if none selected
+            if (this.documents.length > 0 && !this.selectedDoc) {
+                this.selectDocument(this.documents[0]);
+            }
+        },
+
+        async loadCategories() {
+            const response = await fetch('/api/categories');
+            this.categories = await response.json();
+        },
+
+        async scanInbox() {
+            this.scanning = true;
+            try {
+                const response = await fetch('/api/inbox/scan', {method: 'POST'});
+                const data = await response.json();
+                alert(data.message || 'Inbox gescannt!');
+                await this.loadDocuments();
+            } catch (error) {
+                alert('Fehler beim Scannen');
+            } finally {
+                this.scanning = false;
+            }
+        },
+
+        async processWithOCR() {
+            if (!this.selectedDoc) return;
+
+            this.processing = true;
+            try {
+                const endpoint = this.formData.type === 'income'
+                    ? `/income/process/${this.selectedDoc.id}`
+                    : `/process/${this.selectedDoc.id}`;
+
+                const response = await fetch(endpoint);
+                const data = await response.json();
+
+                // Fill form with extracted data
+                if (data.date) this.formData.date = data.date;
+                if (data.amount) this.formData.amount = data.amount;
+                if (data.category) this.formData.category = data.category;
+                if (data.description) this.formData.description = data.description;
+
+            } catch (error) {
+                alert('OCR Fehler: ' + error.message);
+            } finally {
+                this.processing = false;
+            }
+        },
+
+        async saveDocument() {
+            if (!this.selectedDoc) return;
+
+            this.saving = true;
+            try {
+                const endpoint = this.formData.type === 'income'
+                    ? `/api/income/${this.selectedDoc.id}`
+                    : `/api/invoice/${this.selectedDoc.id}`;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(this.formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Remove from list and select next
+                    const currentIndex = this.documents.findIndex(d => d.id === this.selectedDoc.id);
+                    this.documents.splice(currentIndex, 1);
+
+                    if (this.documents.length > 0) {
+                        const nextIndex = Math.min(currentIndex, this.documents.length - 1);
+                        this.selectDocument(this.documents[nextIndex]);
+                    } else {
+                        this.selectedDoc = null;
+                    }
+
+                    // Reset form
+                    this.formData = {
+                        type: 'expense',
+                        date: new Date().toISOString().split('T')[0],
+                        amount: '',
+                        category: '',
+                        description: ''
+                    };
+                } else {
+                    alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+                }
+            } catch (error) {
+                alert('Fehler beim Speichern');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        selectDocument(doc) {
+            this.selectedDoc = doc;
+
+            // Reset form
+            this.formData = {
+                type: 'expense',
+                date: new Date().toISOString().split('T')[0],
+                amount: '',
+                category: '',
+                description: ''
+            };
+
+            // Load categories for document type
+            if (doc.business) {
+                this.loadCategoriesForType(this.formData.type);
+            }
+
+            // Auto-run OCR if document hasn't been processed
+            if (!doc.reviewed && !doc.ocr_text) {
+                setTimeout(() => {
+                    this.processWithOCR();
+                }, 300); // Small delay for smooth UX
+            } else if (doc.ocr_text) {
+                // Load existing data if already processed
+                if (doc.date) this.formData.date = doc.date;
+                if (doc.amount) this.formData.amount = doc.amount;
+                if (doc.category) this.formData.category = doc.category;
+                if (doc.description) this.formData.description = doc.description;
+            }
+        },
+
+        async loadCategoriesForType(type) {
+            const endpoint = type === 'income' ? '/api/income/categories' : '/api/categories';
+            const response = await fetch(endpoint);
+            this.categories = await response.json();
+        },
+
+        selectPrevious() {
+            const filtered = this.filteredDocuments;
+            const currentIndex = filtered.findIndex(d => d.id === this.selectedDoc?.id);
+            if (currentIndex > 0) {
+                this.selectDocument(filtered[currentIndex - 1]);
+            }
+        },
+
+        selectNext() {
+            const filtered = this.filteredDocuments;
+            const currentIndex = filtered.findIndex(d => d.id === this.selectedDoc?.id);
+            if (currentIndex < filtered.length - 1) {
+                this.selectDocument(filtered[currentIndex + 1]);
+            }
+        },
+
+        get filteredDocuments() {
+            if (this.selectedBusiness === null) {
+                return this.documents;
+            }
+            return this.documents.filter(d => d.business_id === this.selectedBusiness);
+        },
+
+        getBusinessDocCount(businessId) {
+            return this.documents.filter(d => d.business_id === businessId).length;
+        },
+
+        getArchivePath() {
+            if (!this.selectedDoc) return '';
+            const folder = this.formData.type === 'income' ? 'Einnahmen' : 'Ausgaben';
+            const year = new Date().getFullYear();
+            return `Archive/${this.selectedDoc.business.name}/${folder}/${year}/`;
+        },
+
+        formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('de-DE');
+        },
+
+        calculateTax() {
+            // Calculate tax amount based on gross amount and tax rate
+            if (this.formData.amount && this.formData.tax_rate) {
+                const gross = parseFloat(this.formData.amount);
+                const rate = parseFloat(this.formData.tax_rate);
+                this.formData.net_amount = gross / (1 + rate / 100);
+                this.formData.tax_amount = gross - this.formData.net_amount;
+            }
+        },
+
+        async deleteDocument() {
+            if (!this.selectedDoc) return;
+
+            if (!confirm(`Dokument "${this.selectedDoc.filename || this.selectedDoc.original_filename}" wirklich löschen?\n\nDie Datei wird permanent gelöscht!`)) {
+                return;
+            }
+
+            this.deleting = true;
+            try {
+                const response = await fetch(`/api/invoice/${this.selectedDoc.id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Remove from list
+                    const currentIndex = this.documents.findIndex(d => d.id === this.selectedDoc.id);
+                    this.documents.splice(currentIndex, 1);
+
+                    // Select next or previous document
+                    if (this.documents.length > 0) {
+                        const nextIndex = Math.min(currentIndex, this.documents.length - 1);
+                        this.selectDocument(this.documents[nextIndex]);
+                    } else {
+                        this.selectedDoc = null;
+                    }
+                } else {
+                    alert('Fehler beim Löschen: ' + (data.error || 'Unbekannter Fehler'));
+                }
+            } catch (error) {
+                alert('Fehler beim Löschen: ' + error.message);
+            } finally {
+                this.deleting = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

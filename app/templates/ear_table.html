@@ -1,0 +1,484 @@
+{% extends "base_new.html" %}
+
+{% block page_title %}EAR-Tabelle{% endblock %}
+
+{% block content %}
+<div class="h-full flex flex-col" x-data="earTable()">
+
+    <!-- Filter Bar -->
+    <div class="p-4 bg-white border-b border-apple-gray-200">
+        <div class="flex items-center space-x-4">
+            <!-- Search -->
+            <div class="flex-1 relative">
+                <input
+                    type="text"
+                    x-model="searchQuery"
+                    @input="filterDocuments()"
+                    placeholder="Suche nach Beschreibung, Kennung..."
+                    class="w-full px-4 py-2 pl-10 text-sm bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                >
+                <svg class="absolute left-3 top-2.5 w-5 h-5 text-apple-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+
+            <!-- Type Filter -->
+            <select
+                x-model="typeFilter"
+                @change="filterDocuments()"
+                class="px-4 py-2 text-sm bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+            >
+                <option value="">Alle Typen</option>
+                <option value="income">Einnahmen</option>
+                <option value="expense">Ausgaben</option>
+            </select>
+
+            <!-- Year Selector -->
+            <select
+                onchange="window.location.href='/documents?year=' + this.value + (new URLSearchParams(window.location.search).get('business_id') ? '&business_id=' + new URLSearchParams(window.location.search).get('business_id') : '')"
+                class="px-4 py-2 text-sm bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent font-medium"
+            >
+                {% for y in available_years %}
+                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+
+            <!-- Date Range -->
+            <input
+                type="date"
+                x-model="dateFrom"
+                @change="filterDocuments()"
+                class="px-4 py-2 text-sm bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                placeholder="Von"
+            >
+            <span class="text-apple-gray-400">bis</span>
+            <input
+                type="date"
+                x-model="dateTo"
+                @change="filterDocuments()"
+                class="px-4 py-2 text-sm bg-apple-gray-50 border border-apple-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent"
+                placeholder="Bis"
+            >
+
+            <!-- Reset -->
+            <button
+                @click="resetFilters()"
+                class="px-4 py-2 text-sm font-medium text-apple-gray-700 bg-apple-gray-100 rounded-lg hover:bg-apple-gray-200 transition-colors"
+            >
+                Reset
+            </button>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="flex-1 overflow-auto bg-white">
+        <table class="w-full">
+            <thead class="sticky top-0 bg-apple-gray-50 border-b border-apple-gray-200">
+                <tr class="text-left text-xs font-medium text-apple-gray-600 uppercase tracking-wider">
+                    <th class="px-4 py-3 w-32">Datum</th>
+                    <th class="px-4 py-3 w-32">Kennung</th>
+                    <th class="px-4 py-3 w-24">Typ</th>
+                    <th class="px-4 py-3">Kategorie</th>
+                    <th class="px-4 py-3">Beschreibung</th>
+                    <th class="px-4 py-3 text-right w-32">Einnahme</th>
+                    <th class="px-4 py-3 text-right w-32">Ausgabe</th>
+                    <th class="px-4 py-3 text-right w-32">Saldo</th>
+                    <th class="px-4 py-3 w-20"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-apple-gray-200">
+                <template x-for="(doc, index) in filteredDocuments" :key="doc.id">
+                    <tr
+                        class="hover:bg-apple-gray-50 transition-colors cursor-pointer"
+                        @click="openDocument(doc)"
+                    >
+                        <!-- Date -->
+                        <td class="px-4 py-3 text-sm text-apple-gray-900" x-text="doc.date"></td>
+
+                        <!-- Invoice ID -->
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2">
+                                <!-- Status Markers -->
+                                <div class="flex items-center gap-1">
+                                    <!-- Unread Marker -->
+                                    <span
+                                        x-show="doc.unread"
+                                        class="inline-block w-2 h-2 bg-apple-blue rounded-full"
+                                        title="Ungelesen"
+                                    ></span>
+
+                                    <!-- Flagged Marker -->
+                                    <svg
+                                        x-show="doc.flagged"
+                                        class="w-4 h-4 text-apple-red"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                        title="Markiert"
+                                    >
+                                        <path d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z"/>
+                                    </svg>
+                                </div>
+
+                                <!-- Invoice ID Badge -->
+                                <span
+                                    :class="doc.invoice_id && doc.invoice_id.startsWith('ERE') ? 'bg-apple-green/10 text-apple-green' : 'bg-apple-orange/10 text-apple-orange'"
+                                    class="inline-block px-2 py-1 text-xs font-medium rounded"
+                                    x-text="doc.invoice_id || '-'"
+                                ></span>
+                            </div>
+                        </td>
+
+                        <!-- Type -->
+                        <td class="px-4 py-3">
+                            <span
+                                x-show="doc.invoice_id && doc.invoice_id.startsWith('ERE')"
+                                class="text-xs font-medium text-apple-green"
+                            >
+                                Einnahme
+                            </span>
+                            <span
+                                x-show="doc.invoice_id && doc.invoice_id.startsWith('ARE')"
+                                class="text-xs font-medium text-apple-orange"
+                            >
+                                Ausgabe
+                            </span>
+                        </td>
+
+                        <!-- Category -->
+                        <td class="px-4 py-3">
+                            <span
+                                x-show="doc.category"
+                                :class="getCategoryColor(doc.category)"
+                                class="inline-block px-2 py-0.5 text-xs rounded font-medium"
+                                x-text="doc.category"
+                            ></span>
+                            <span x-show="!doc.category" class="text-sm text-apple-gray-400">-</span>
+                        </td>
+
+                        <!-- Description -->
+                        <td class="px-4 py-3 text-sm text-apple-gray-900" x-text="doc.description || '-'"></td>
+
+                        <!-- Income Amount -->
+                        <td class="px-4 py-3 text-right">
+                            <span
+                                x-show="doc.invoice_id && doc.invoice_id.startsWith('ERE')"
+                                class="text-sm font-semibold text-apple-green"
+                                x-text="doc.amount ? '+' + formatCurrency(doc.amount) + ' €' : '-'"
+                            ></span>
+                            <span
+                                x-show="!doc.invoice_id || !doc.invoice_id.startsWith('ERE')"
+                                class="text-sm text-apple-gray-400"
+                            >-</span>
+                        </td>
+
+                        <!-- Expense Amount -->
+                        <td class="px-4 py-3 text-right">
+                            <span
+                                x-show="doc.invoice_id && doc.invoice_id.startsWith('ARE')"
+                                class="text-sm font-semibold text-apple-orange"
+                                x-text="doc.amount ? '-' + formatCurrency(doc.amount) + ' €' : '-'"
+                            ></span>
+                            <span
+                                x-show="!doc.invoice_id || !doc.invoice_id.startsWith('ARE')"
+                                class="text-sm text-apple-gray-400"
+                            >-</span>
+                        </td>
+
+                        <!-- Balance -->
+                        <td class="px-4 py-3 text-right">
+                            <span
+                                :class="doc.balance >= 0 ? 'text-apple-green' : 'text-apple-red'"
+                                class="text-sm font-bold"
+                                x-text="doc.balance ? formatCurrency(doc.balance) + ' €' : '0,00 €'"
+                            ></span>
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="px-4 py-3">
+                            <!-- Upload button for placeholder PDFs -->
+                            <button
+                                x-show="isPlaceholderPDF(doc)"
+                                @click.stop="uploadPDF(doc.id)"
+                                class="p-1 rounded-lg hover:bg-apple-blue/10 transition-colors"
+                                title="PDF hochladen"
+                            >
+                                <svg class="w-5 h-5 text-apple-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </button>
+
+                            <!-- View button for real PDFs -->
+                            <button
+                                x-show="!isPlaceholderPDF(doc)"
+                                @click.stop="openPDF(doc.id)"
+                                class="p-1 rounded-lg hover:bg-apple-gray-100 transition-colors"
+                                title="PDF ansehen"
+                            >
+                                <svg class="w-5 h-5 text-apple-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+
+            <!-- Footer with Totals -->
+            <tfoot class="sticky bottom-0 bg-apple-gray-50 border-t-2 border-apple-gray-300">
+                <tr class="font-semibold text-sm">
+                    <td colspan="5" class="px-4 py-3 text-right text-apple-gray-700">Gesamt:</td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="text-apple-green font-bold" x-text="formatCurrency(totalIncome) + ' €'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="text-apple-orange font-bold" x-text="formatCurrency(totalExpenses) + ' €'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <span
+                            :class="finalBalance >= 0 ? 'text-apple-green' : 'text-apple-red'"
+                            class="font-bold text-base"
+                            x-text="formatCurrency(finalBalance) + ' €'"
+                        ></span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="text-sm text-apple-gray-500">-</span>
+                    </td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- Empty State -->
+        <div x-show="filteredDocuments.length === 0" class="flex flex-col items-center justify-center py-16">
+            <svg class="w-20 h-20 text-apple-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p class="mt-4 text-sm text-apple-gray-500">Keine Dokumente gefunden</p>
+            <button
+                @click="resetFilters()"
+                class="mt-4 px-4 py-2 text-sm font-medium text-white bg-apple-blue rounded-lg hover:bg-apple-blue/90 transition-colors"
+            >
+                Filter zurücksetzen
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Bar -->
+    <div class="p-4 bg-white border-t border-apple-gray-200">
+        <div class="flex items-center justify-between text-sm">
+            <span class="text-apple-gray-600">
+                <span x-text="filteredDocuments.length"></span> Belege angezeigt
+                <span x-show="documents.length !== filteredDocuments.length" class="text-apple-gray-400">
+                    (von <span x-text="documents.length"></span> gesamt)
+                </span>
+            </span>
+
+            <!-- Export Buttons -->
+            <div class="flex space-x-2">
+                <a
+                    href="/export/excel"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-apple-blue rounded-lg hover:bg-apple-blue/90 transition-colors"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Excel exportieren
+                </a>
+
+                <a
+                    :href="'/export/full?year={{ selected_year }}' + (new URLSearchParams(window.location.search).get('business_id') ? '&business_id=' + new URLSearchParams(window.location.search).get('business_id') : '')"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-apple-green rounded-lg hover:bg-green-600 transition-colors"
+                    title="Vollständiges Paket für Steuerberater (Excel + alle Belege + Platzhalter-PDFs)"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Vollständiger Export (ZIP)
+                </a>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function earTable() {
+    return {
+        documents: {{ documents | tojson }},
+        filteredDocuments: [],
+        searchQuery: '',
+        typeFilter: '',
+        dateFrom: '',
+        dateTo: '',
+
+        init() {
+            this.calculateBalances();
+            this.filterDocuments();
+        },
+
+        calculateBalances() {
+            let balance = 0;
+            // Sort by date ascending to calculate running balance
+            const sorted = [...this.documents].sort((a, b) =>
+                new Date(a.date || 0) - new Date(b.date || 0)
+            );
+
+            sorted.forEach(doc => {
+                if (doc.invoice_id && doc.invoice_id.startsWith('ERE')) {
+                    balance += doc.amount || 0;
+                } else if (doc.invoice_id && doc.invoice_id.startsWith('ARE')) {
+                    balance -= doc.amount || 0;
+                }
+                doc.balance = balance;
+            });
+
+            // Sort back to descending for display
+            this.documents.sort((a, b) =>
+                new Date(b.date || 0) - new Date(a.date || 0)
+            );
+        },
+
+        filterDocuments() {
+            this.filteredDocuments = this.documents.filter(doc => {
+                // Type filter
+                if (this.typeFilter === 'income' && (!doc.invoice_id || !doc.invoice_id.startsWith('ERE'))) {
+                    return false;
+                }
+                if (this.typeFilter === 'expense' && (!doc.invoice_id || !doc.invoice_id.startsWith('ARE'))) {
+                    return false;
+                }
+
+                // Date range filter
+                if (this.dateFrom && doc.date < this.dateFrom) return false;
+                if (this.dateTo && doc.date > this.dateTo) return false;
+
+                // Search filter
+                if (this.searchQuery) {
+                    const query = this.searchQuery.toLowerCase();
+                    const searchText = [
+                        doc.description,
+                        doc.invoice_id,
+                        doc.category,
+                        doc.date
+                    ].filter(Boolean).join(' ').toLowerCase();
+
+                    return searchText.includes(query);
+                }
+
+                return true;
+            });
+        },
+
+        resetFilters() {
+            this.searchQuery = '';
+            this.typeFilter = '';
+            this.dateFrom = '';
+            this.dateTo = '';
+            this.filterDocuments();
+        },
+
+        openDocument(doc) {
+            // Determine if it's income or expense and navigate
+            if (doc.invoice_id && doc.invoice_id.startsWith('ERE')) {
+                window.location.href = '/income?doc=' + doc.id;
+            } else {
+                window.location.href = '/expenses?doc=' + doc.id;
+            }
+        },
+
+        openPDF(docId) {
+            window.open('/file/' + docId, '_blank');
+        },
+
+        isPlaceholderPDF(doc) {
+            // Check if it's a generated placeholder PDF using database flag
+            return doc.is_placeholder_pdf === true || doc.is_placeholder_pdf === 1;
+        },
+
+        async uploadPDF(docId) {
+            // Create file input
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf';
+
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch(`/api/invoice/${docId}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        showToast('PDF erfolgreich hochgeladen!', 'success');
+                        location.reload();
+                    } else {
+                        const error = await response.json();
+                        showToast('Fehler beim Hochladen: ' + (error.error || 'Unbekannter Fehler'), 'error');
+                    }
+                } catch (error) {
+                    showToast('Fehler beim Hochladen: ' + error.message, 'error');
+                }
+            };
+
+            input.click();
+        },
+
+        get totalIncome() {
+            return this.filteredDocuments
+                .filter(d => d.invoice_id && d.invoice_id.startsWith('ERE'))
+                .reduce((sum, d) => sum + (d.amount || 0), 0);
+        },
+
+        get totalExpenses() {
+            return this.filteredDocuments
+                .filter(d => d.invoice_id && d.invoice_id.startsWith('ARE'))
+                .reduce((sum, d) => sum + (d.amount || 0), 0);
+        },
+
+        get finalBalance() {
+            return this.totalIncome - this.totalExpenses;
+        },
+
+        getCategoryColor(category) {
+            // Expense categories
+            const expenseColors = {
+                'Büro': 'bg-blue-100 text-blue-800',
+                'Raum': 'bg-purple-100 text-purple-800',
+                'Telefon': 'bg-green-100 text-green-800',
+                'Fahrtkosten': 'bg-orange-100 text-orange-800',
+                'Fortbildung': 'bg-red-100 text-red-800',
+                'Versicherung': 'bg-pink-100 text-pink-800',
+                'Porto': 'bg-yellow-100 text-yellow-800',
+                'Werbung': 'bg-indigo-100 text-indigo-800',
+                'Sonstiges': 'bg-gray-100 text-gray-800'
+            };
+
+            // Income categories
+            const incomeColors = {
+                'Honorar': 'bg-blue-100 text-blue-800',
+                'Lizenzgebühren': 'bg-purple-100 text-purple-800',
+                'Workshops': 'bg-green-100 text-green-800',
+                'Stipendien': 'bg-orange-100 text-orange-800',
+                'Verkäufe': 'bg-red-100 text-red-800',
+                'Sonstiges': 'bg-gray-100 text-gray-800'
+            };
+
+            return expenseColors[category] || incomeColors[category] || 'bg-gray-100 text-gray-800';
+        },
+
+        formatCurrency(num) {
+            return (num || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+    }
+}
+</script>
+{% endblock %}

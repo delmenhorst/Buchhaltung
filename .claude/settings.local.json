@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Read(//private/tmp/**)",
+      "Bash(tree:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(python app.py:*)",
+      "Bash(ollama list:*)",
+      "Bash(pkill:*)",
+      "Bash(open:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(killall:*)",
+      "Bash(find:*)",
+      "Bash(export FLASK_ENV=development)",
+      "Bash(curl:*)",
+      "Bash(kill:*)",
+      "Bash(awk:*)",
+      "Bash(rm:*)",
+      "Bash(python -c:*)",
+      "Bash(python3:*)",
+      "Read(//Users/denis/Developer/Buchhaltung/**)",
+      "Bash(test:*)",
+      "Bash(cat:*)",
+      "Bash(./venv/bin/python:*)",
+      "Bash(/Users/denis/Developer/Buchhaltung/app/venv/bin/python:*)",
+      "Read(//opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/bin/**)",
+      "Bash(sqlite3:*)",
+      "Bash(mkdir:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "plan"
+  }
+}

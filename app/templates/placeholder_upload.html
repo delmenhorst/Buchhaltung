@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF hochladen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+        <div class="mb-6">
+            <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">Placeholder-PDF</h1>
+            <p class="text-gray-600">Für diese Buchung wurde ein Platzhalter erstellt. Bitte laden Sie die echte Rechnung hoch.</p>
+        </div>
+
+        <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+            <div class="space-y-2 text-sm">
+                <div><span class="font-medium">Beschreibung:</span> {{ invoice.description }}</div>
+                <div><span class="font-medium">Datum:</span> {{ invoice.date }}</div>
+                <div><span class="font-medium">Betrag:</span> {{ "%.2f"|format(invoice.amount) }} €</div>
+                {% if invoice.category %}
+                <div><span class="font-medium">Kategorie:</span> {{ invoice.category }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+
+        <button
+            onclick="document.getElementById('fileInput').click()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors mb-3"
+        >
+            PDF hochladen
+        </button>
+
+        <button
+            onclick="window.close()"
+            class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-6 rounded-lg transition-colors text-sm"
+        >
+            Schließen
+        </button>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const invoiceId = {{ invoice_id }};
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`/api/invoice/${invoiceId}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    // Show success message in opener window if available
+                    if (window.opener && window.opener.showToast) {
+                        window.opener.showToast('PDF erfolgreich hochgeladen!', 'success');
+                    }
+                    window.opener?.location.reload();
+                    window.close();
+                } else {
+                    const error = await response.json();
+                    // Show error in this window
+                    if (window.showToast) {
+                        window.showToast('Fehler beim Hochladen: ' + (error.error || 'Unbekannter Fehler'), 'error');
+                    } else {
+                        alert('Fehler beim Hochladen: ' + (error.error || 'Unbekannter Fehler'));
+                    }
+                }
+            } catch (error) {
+                if (window.showToast) {
+                    window.showToast('Fehler beim Hochladen: ' + error.message, 'error');
+                } else {
+                    alert('Fehler beim Hochladen: ' + error.message);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
