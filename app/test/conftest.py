@@ -29,6 +29,7 @@ def test_db(test_data_dir):
     test_db_path = test_data_dir / 'test_pytest.db'
 
     db = Database(str(test_db_path))
+    db.init_db()  # Initialize database tables
     yield db
 
     # Cleanup
@@ -79,9 +80,6 @@ def create_test_invoice(test_db):
         date_str = datetime.now().strftime('%Y-%m-%d')
         year = datetime.now().year
 
-        # Get next invoice ID
-        next_id = test_db.get_next_invoice_id(year=year, business_id=business_id)
-
         # Get business details
         conn = test_db.get_connection()
         cursor = conn.cursor()
@@ -94,9 +92,11 @@ def create_test_invoice(test_db):
         business_name = business['name']
         prefix = business['prefix']
 
-        # Generate invoice ID
-        type_prefix = 'ARE' if invoice_type == 'Ausgabe' else 'ERE'
-        invoice_id = f"{type_prefix}-{prefix}-{year}{next_id:03d}"
+        # Get next invoice ID (these methods return complete IDs like "ARE-MK-2025001")
+        if invoice_type == 'Ausgabe':
+            invoice_id = test_db.get_next_invoice_id(year=year, business_id=business_id)
+        else:
+            invoice_id = test_db.get_next_income_id(year=year, business_id=business_id)
 
         # Generate filename
         date_obj = datetime.now()
@@ -115,12 +115,12 @@ def create_test_invoice(test_db):
         cursor.execute('''
             INSERT INTO invoices (
                 business_id, file_path, original_filename, invoice_id,
-                date, amount, category, description, type,
+                date, amount, category, description,
                 processed, is_archived, reviewed
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             business_id, file_path, filename, invoice_id,
-            date_str, amount, category, description, invoice_type,
+            date_str, amount, category, description,
             1, 1, 1
         ))
 

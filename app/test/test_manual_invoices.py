@@ -52,7 +52,8 @@ def test_create_manual_income_ere_prefix(test_business, create_test_invoice):
     invoice = cursor.fetchone()
     conn.close()
 
-    assert invoice['type'] == 'Einnahme', "Type should be Einnahme"
+    # Type is determined by invoice_id prefix (ERE = Einnahme, ARE = Ausgabe)
+    assert invoice['invoice_id'].startswith('ERE'), "Invoice ID should start with ERE for Einnahme"
     assert invoice['amount'] == 2500.00, "Amount should be 2500.00"
 
 
@@ -68,8 +69,9 @@ def test_amount_one_decimal_converts_to_two(test_business, create_test_invoice):
         description='Test'
     )
 
+    # Check that amount is formatted with exactly 2 decimal places
     assert '1299_90' in filename, "Amount 1299.9 should become 1299_90"
-    assert '1299_9' not in filename, "Amount should NOT be 1299_9 (missing trailing zero)"
+    assert filename.endswith('1299_90.pdf'), "Filename should end with 1299_90.pdf (not 1299_9.pdf)"
 
 
 def test_amount_edge_cases(test_business, create_test_invoice):
