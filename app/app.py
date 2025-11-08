@@ -874,15 +874,65 @@ def upload_file_to_invoice(file_id):
         is_income = invoice.get('invoice_id', '').startswith('ERE')
         type_folder = 'Einnahmen' if is_income else 'Ausgaben'
 
-        # Create Inbox folder path for this business
-        inbox_path = BASE_DIR / 'Inbox' / business_folder / type_folder
-        inbox_path.mkdir(parents=True, exist_ok=True)
+        # Check if this invoice is already archived
+        is_archived = invoice.get('is_archived') and '/Archive/' in invoice.get('file_path', '')
 
-        # Generate secure filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        safe_description = secure_filename(invoice.get('description', 'document'))[:30]
-        new_filename = f"{timestamp}_{safe_description}{file_ext}"
-        file_path = inbox_path / new_filename
+        if is_archived:
+            # Save directly to Archive with semantic filename
+            # Extract year from invoice date
+            date_str = invoice.get('date')
+            if date_str:
+                try:
+                    if isinstance(date_str, str):
+                        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                    else:
+                        date_obj = date_str
+                    year = date_obj.year
+                except:
+                    year = datetime.now().year
+            else:
+                year = datetime.now().year
+
+            # Create Archive folder path with year
+            archive_path = BASE_DIR / 'Archive' / business_folder / type_folder / str(year)
+            archive_path.mkdir(parents=True, exist_ok=True)
+
+            # Generate semantic filename: YYMMDD_InvoiceID_Category_Description_Amount.pdf
+            if date_str:
+                try:
+                    date_part = date_obj.strftime('%y%m%d')
+                except:
+                    date_part = datetime.now().strftime('%y%m%d')
+            else:
+                date_part = datetime.now().strftime('%y%m%d')
+
+            invoice_id = invoice.get('invoice_id', 'UNKNOWN')
+            category = invoice.get('category', 'Unknown')
+            description = invoice.get('description', '')
+            amount = invoice.get('amount', 0)
+
+            # Sanitize filename components
+            category_safe = category.replace('/', '-')
+            description_safe = (description[:30]
+                              .replace('/', '-')
+                              .replace(' ', '_')
+                              .strip('_'))
+            amount_safe = str(amount).replace('.', '_')
+
+            new_filename = f"{date_part}_{invoice_id}_{category_safe}_{description_safe}_{amount_safe}{file_ext}"
+            new_filename = new_filename.replace('__', '_')  # Clean double underscores
+
+            file_path = archive_path / new_filename
+        else:
+            # Save to Inbox for processing
+            inbox_path = BASE_DIR / 'Inbox' / business_folder / type_folder
+            inbox_path.mkdir(parents=True, exist_ok=True)
+
+            # Generate timestamped filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            safe_description = secure_filename(invoice.get('description', 'document'))[:30]
+            new_filename = f"{timestamp}_{safe_description}{file_ext}"
+            file_path = inbox_path / new_filename
 
         # Save file
         file.save(str(file_path))
@@ -905,10 +955,15 @@ def upload_file_to_invoice(file_id):
                     print(f"Warning: Could not delete old file: {e}")
 
         # Update database with new file path and clear placeholder flag
-        db.update_invoice(file_id, {
+        update_data = {
             'file_path': str(file_path),
             'is_placeholder_pdf': False
-        })
+        }
+        # Preserve is_archived status if file was already archived
+        if is_archived:
+            update_data['is_archived'] = True
+
+        db.update_invoice(file_id, update_data)
 
         # Run OCR automatically after upload (use correct processor based on type)
         try:
