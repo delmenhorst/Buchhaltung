@@ -16,7 +16,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from test_helpers import TestBase, TestDataFactory, cleanup_test_folders
+from app.test.test_helpers import TestBase, TestDataFactory, cleanup_test_folders
 
 
 class ManualInvoicesTester(TestBase):
