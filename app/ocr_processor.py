@@ -11,12 +11,12 @@ class OCRProcessor:
         # Configure tesseract path if needed (for macOS with Homebrew)
         # pytesseract.pytesseract.tesseract_cmd = '/opt/homebrew/bin/tesseract'
 
-        # Initialize LLM extractor with better model (gemma3:27b for improved accuracy)
+        # Initialize LLM extractor with better model (gemma3:4b for improved accuracy)
         self.use_llm = use_llm
         if use_llm:
-            self.llm = LLMExtractor(model='gemma3:27b')
+            self.llm = LLMExtractor(model='gemma3:4b')
             if self.llm.is_available():
-                print("✅ Ollama LLM available (gemma3:27b) - using AI-enhanced extraction")
+                print("✅ Ollama LLM available (gemma3:4b) - using AI-enhanced extraction")
             else:
                 print("⚠️  Ollama not available - falling back to regex extraction")
                 self.use_llm = False

@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, jsonify, send_file
 from pathlib import Path
+import os
+from datetime import timedelta
 from ocr_processor import OCRProcessor
 from income_processor import IncomeProcessor
 from database import Database
@@ -11,7 +13,19 @@ from pdf_generator import PDFGenerator
 from full_exporter import FullExporter
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-change-this'
+
+# Load SECRET_KEY from environment or use default (dev only)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
+
+# Session configuration for better security and stability
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access (XSS protection)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+# Only set SECURE in production (requires HTTPS)
+if os.environ.get('FLASK_ENV') != 'development':
+    app.config['SESSION_COOKIE_SECURE'] = True
 
 # Paths
 BASE_DIR = Path(__file__).parent.parent  # Go up to FINANZEN folder
