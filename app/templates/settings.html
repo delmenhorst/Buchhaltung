@@ -302,20 +302,29 @@ function settingsApp() {
                     return;
                 }
 
-                // Check if error is about invoices
-                if (testData.error && testData.error.includes('invoices still associated')) {
-                    // Extract invoice count from error message
-                    const match = testData.error.match(/(\d+) invoices/);
-                    const count = match ? match[1] : '?';
+                // Check if error is about invoices or recurring transactions
+                if (testData.error && (testData.error.includes('invoices') || testData.error.includes('recurring transactions'))) {
+                    // Extract counts from error message
+                    const invoiceMatch = testData.error.match(/(\d+) invoices/);
+                    const recurringMatch = testData.error.match(/(\d+) recurring transactions/);
+                    const invoiceCount = invoiceMatch ? parseInt(invoiceMatch[1]) : 0;
+                    const recurringCount = recurringMatch ? parseInt(recurringMatch[1]) : 0;
+
+                    // Build message
+                    let message = `⚠️ ACHTUNG: Dieses Business hat zugeordnete Daten:\n\n`;
+                    if (invoiceCount > 0) {
+                        message += `• ${invoiceCount} Rechnungen (Einnahmen + Ausgaben)\n`;
+                    }
+                    if (recurringCount > 0) {
+                        message += `• ${recurringCount} wiederkehrende Buchungen\n`;
+                    }
+                    message += `\nWas möchten Sie tun?\n\n`;
+                    message += `OK = ALLES LÖSCHEN (Business + alle Daten + Dateien)\n`;
+                    message += `Abbrechen = Nichts löschen\n\n`;
+                    message += `⚠️ Diese Aktion kann NICHT rückgängig gemacht werden!`;
 
                     // Show CASCADE option dialog
-                    const choice = confirm(
-                        `⚠️ ACHTUNG: Dieses Business hat ${count} zugeordnete Rechnungen!\n\n` +
-                        `Was möchten Sie tun?\n\n` +
-                        `OK = ALLES LÖSCHEN (Business + alle ${count} Rechnungen + Dateien)\n` +
-                        `Abbrechen = Nichts löschen\n\n` +
-                        `⚠️ Diese Aktion kann NICHT rückgängig gemacht werden!`
-                    );
+                    const choice = confirm(message);
 
                     if (!choice) {
                         return; // User cancelled
@@ -330,7 +339,10 @@ function settingsApp() {
 
                     if (cascadeResponse.ok) {
                         await this.loadBusinesses();
-                        showToast(`Business und alle ${count} Rechnungen wurden gelöscht!`, 'success');
+                        let successMsg = 'Business gelöscht!';
+                        if (invoiceCount > 0) successMsg += ` (${invoiceCount} Rechnungen)`;
+                        if (recurringCount > 0) successMsg += ` (${recurringCount} wiederkehrende)`;
+                        showToast(successMsg, 'success');
 
                         // Notify other components
                         window.dispatchEvent(new CustomEvent('businesses-updated'));
