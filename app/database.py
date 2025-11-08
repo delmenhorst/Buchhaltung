@@ -36,13 +36,13 @@ class Database:
         needs_migration = 'business_id' not in columns
 
         if needs_migration:
-            # Create new invoices table with business_id
+            # Create new invoices table with business_id and all fields
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS invoices_new (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     business_id INTEGER,
-                    file_path TEXT NOT NULL UNIQUE,
-                    original_filename TEXT NOT NULL,
+                    file_path TEXT UNIQUE,
+                    original_filename TEXT,
                     invoice_id TEXT,
                     date TEXT,
                     amount REAL,
@@ -51,6 +51,13 @@ class Database:
                     ocr_text TEXT,
                     reviewed BOOLEAN DEFAULT 0,
                     processed BOOLEAN DEFAULT 0,
+                    is_archived BOOLEAN DEFAULT 0,
+                    flagged BOOLEAN DEFAULT 0,
+                    supplier TEXT,
+                    unread BOOLEAN DEFAULT 1,
+                    recurring_transaction_id INTEGER,
+                    is_recurring_generated BOOLEAN DEFAULT 0,
+                    is_placeholder_pdf BOOLEAN DEFAULT 0,
                     -- Income-specific fields
                     invoice_number TEXT,
                     customer_name TEXT,
