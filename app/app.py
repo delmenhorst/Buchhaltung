@@ -303,7 +303,7 @@ def update_invoice(file_id):
                               .replace('/', '-')
                               .replace(' ', '_')
                               .strip('_'))
-            amount_safe = str(data.get('amount', 0)).replace('.', '_')
+            amount_safe = f"{float(data.get('amount', 0)):.2f}".replace('.', '_')
 
             new_filename = f"{date_str}_{next_id}_{category_safe}_{description_safe}_{amount_safe}.pdf"
             new_filename = new_filename.replace('__', '_')  # Clean double underscores
@@ -701,7 +701,7 @@ def update_income(file_id):
                               .replace('/', '-')
                               .replace(' ', '_')
                               .strip('_'))
-            amount_safe = str(data.get('amount', 0)).replace('.', '_')
+            amount_safe = f"{float(data.get('amount', 0)):.2f}".replace('.', '_')
 
             new_filename = f"{date_str}_{next_id}_{category_safe}_{description_safe}_{amount_safe}.pdf"
             new_filename = new_filename.replace('__', '_')  # Clean double underscores
@@ -961,7 +961,7 @@ def create_manual_invoice():
                           .replace('/', '-')
                           .replace(' ', '_')
                           .strip('_'))
-        amount_safe = str(data.get('amount', 0)).replace('.', '_')
+        amount_safe = f"{float(data.get('amount', 0)):.2f}".replace('.', '_')
 
         filename = f"{date_str}_{next_id}_{category_safe}_{description_safe}_{amount_safe}.virtual"
         filename = filename.replace('__', '_')  # Clean double underscores
@@ -1447,7 +1447,7 @@ def generate_missing_placeholders():
                               .replace('/', '-')
                               .replace(' ', '_')
                               .strip('_'))
-            amount_safe = str(invoice_dict.get('amount', 0)).replace('.', '_')
+            amount_safe = f"{float(invoice_dict.get('amount', 0)):.2f}".replace('.', '_')
 
             pdf_filename = f"{date_str}_{invoice_dict['invoice_id']}_{category_safe}_{description_safe}_{amount_safe}.pdf"
             pdf_filename = pdf_filename.replace('__', '_')  # Clean double underscores
