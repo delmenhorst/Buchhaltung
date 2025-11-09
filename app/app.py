@@ -1477,9 +1477,8 @@ def generate_missing_placeholders():
         cursor.execute('''
             SELECT id, business_id, invoice_id, date, amount, category, description, file_path, is_archived, is_recurring_generated
             FROM invoices
-            WHERE invoice_id IS NOT NULL AND (file_path IS NULL OR file_path = '' OR NOT EXISTS (
-                SELECT 1 WHERE file_path LIKE '%.pdf'
-            ))
+            WHERE invoice_id IS NOT NULL
+              AND (file_path IS NULL OR file_path = '' OR file_path NOT LIKE '%.pdf')
         ''')
         invoices_without_pdf = cursor.fetchall()
         conn.close()
